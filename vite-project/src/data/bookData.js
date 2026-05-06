@@ -5,8 +5,10 @@ export const STORAGE_KEYS = {
   accounts: 'bookworm-accounts',
   library: 'bookworm-local-library',
   favorites: 'bookworm-favorites',
+  history: 'bookworm-history',
   progress: 'bookworm-progress',
   notes: 'bookworm-notes',
+  staff: 'bookworm-staff',
 }
 
 export const fallbackBooks = [
@@ -69,4 +71,6 @@ export const starterAccounts = [
   { name: 'Admin Demo', email: 'admin@bookworm.test', password: 'admin123', role: 'admin' },
 ]
 
-export const ADMIN_EMAILS = ['admin@bookworm.test']
+export const ADMIN_EMAIL = 'adminbookworm2026@gmail.com'
+export const ADMIN_PASSWORD = 'Admin123'
+export const ADMIN_EMAILS = [ADMIN_EMAIL]
