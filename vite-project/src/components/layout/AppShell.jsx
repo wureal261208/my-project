@@ -1,5 +1,6 @@
 import { getInitials } from '../../utils/bookUtils'
 import logo from '../../assets/logo.jpg'
+import { useNavigation } from '../../context/navigation'
 
 const navItems = [
   { id: 'home', label: 'Home', icon: 'bi-house' },
@@ -8,14 +9,15 @@ const navItems = [
   { id: 'admin', label: 'Admin', icon: 'bi-shield-lock', admin: true },
 ]
 
-function AppShell({ account, activePage, children, onAuth, onGuest, onLogout, setActivePage }) {
+function AppShell({ account, children, onAuth, onGuest, onLogout }) {
+  const { activePage, isPageLoading, navigateTo } = useNavigation()
   const isGuest = account?.role === 'guest'
   const displayName = account?.name || 'None Account'
 
   return (
     <div className="book-app">
       <header className="site-header">
-        <button className="brand-button" onClick={() => setActivePage('home')} type="button">
+        <button className="brand-button" onClick={() => navigateTo('home')} type="button">
           <img src={logo} alt="BookWorm logo" />
           <span>BookWorm</span>
         </button>
@@ -29,7 +31,7 @@ function AppShell({ account, activePage, children, onAuth, onGuest, onLogout, se
               <button
                 className={activePage === item.id ? 'active' : ''}
                 key={item.id}
-                onClick={() => setActivePage(item.id)}
+                onClick={() => navigateTo(item.id)}
                 type="button"
               >
                 <i className={`bi ${item.icon}`} />
@@ -40,7 +42,7 @@ function AppShell({ account, activePage, children, onAuth, onGuest, onLogout, se
         </nav>
 
         <div className="header-account">
-          <button className="avatar-chip" onClick={() => (isGuest ? onAuth() : setActivePage('profile'))} type="button">
+          <button className="avatar-chip" onClick={() => (isGuest ? onAuth() : navigateTo('profile'))} type="button">
             <span>{getInitials(displayName)}</span>
             <strong>{displayName}</strong>
           </button>
@@ -62,6 +64,37 @@ function AppShell({ account, activePage, children, onAuth, onGuest, onLogout, se
       </header>
 
       <main className="page-shell">{children}</main>
+      <footer className="site-footer">
+        <section className="footer-brand">
+          <div className="footer-logo">
+            <img src={logo} alt="BookWorm logo" />
+          </div>
+          <div>
+            <strong>BookWorm</strong>
+            <p>A focused digital library for keeping books, notes, comments, and checkpoints in one quiet place.</p>
+          </div>
+        </section>
+        <section className="footer-columns">
+          <nav aria-label="Footer navigation">
+            <span>Explore</span>
+            <button className="footer-link" onClick={() => navigateTo('home')} type="button">Home</button>
+            <button className="footer-link" onClick={() => navigateTo('discover')} type="button">Discover</button>
+            {!isGuest && <button onClick={() => navigateTo('profile')} type="button">Profile</button>}
+          </nav>
+          <div>
+            <span>Reader tools</span>
+            <p>Checkpoint sync</p>
+            <p>Personal notes</p>
+            <p>Community comments</p>
+          </div>
+        </section>
+      </footer>
+      {isPageLoading && (
+        <div className="route-loader" role="status">
+          <img src={logo} alt="BookWorm logo" />
+          <span>Opening page...</span>
+        </div>
+      )}
     </div>
   )
 }

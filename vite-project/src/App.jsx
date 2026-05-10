@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -13,12 +13,15 @@ import {
   ADMIN_EMAILS,
   ADMIN_PASSWORD,
   API_URL,
+  STAFF_DEFAULT_PASSWORD,
   STORAGE_KEYS,
   fallbackBooks,
 } from './data/bookData'
+import { NavigationProvider } from './context/NavigationContext'
 import { auth } from './firebase'
 import { getAuthor, getCategory } from './utils/bookUtils'
 import { readStorage, writeStorage } from './utils/storage'
+import logo from './assets/logo.jpg'
 import './App.css'
 
 const AdminPage = lazy(() => import('./components/pages/AdminPage'))
@@ -31,6 +34,15 @@ const ReaderPage = lazy(() => import('./components/pages/ReaderPage'))
 const emptyAuthForm = { name: '', email: '', password: '' }
 const emptyAdminBook = { title: '', author: '', category: '', readerUrl: '', cover: '' }
 const guestAccount = { id: 'guest', name: 'None Account', email: 'guest@bookworm.local', role: 'guest' }
+const pageInitialState = { activePage: 'home', isPageLoading: false }
+const SEARCH_HISTORY_LIMIT = 8
+
+function pageReducer(state, action) {
+  if (action.type === 'start') return { ...state, isPageLoading: true }
+  if (action.type === 'finish') return { activePage: action.page, isPageLoading: false }
+  if (action.type === 'instant') return { activePage: action.page, isPageLoading: false }
+  return state
+}
 
 function App() {
   const [account, setAccount] = useState(guestAccount)
@@ -40,24 +52,57 @@ function App() {
   const [authMode, setAuthMode] = useState('login')
   const [authReady, setAuthReady] = useState(false)
   const [toast, setToast] = useState(null)
-  const [activePage, setActivePage] = useState('home')
+  const [pageState, dispatchPage] = useReducer(pageReducer, pageInitialState)
+  const routeTimerRef = useRef(null)
   const [books, setBooks] = useState(fallbackBooks)
-  const [booksLoading, setBooksLoading] = useState(false)
-  const [booksNextUrl, setBooksNextUrl] = useState('')
+  const [, setBooksLoading] = useState(false)
   const [localBooks, setLocalBooks] = useState(() => readStorage(STORAGE_KEYS.library, []))
   const [favorites, setFavorites] = useState(() => readStorage(STORAGE_KEYS.favorites, []))
   const [history, setHistory] = useState(() => readStorage(STORAGE_KEYS.history, []))
+  const [readingActivity, setReadingActivity] = useState(() => readStorage(STORAGE_KEYS.readingActivity, {}))
+  const [viewCounts, setViewCounts] = useState(() => readStorage(STORAGE_KEYS.views, {}))
+  const [bookReaders, setBookReaders] = useState(() => readStorage(STORAGE_KEYS.readers, {}))
   const [progress, setProgress] = useState(() => readStorage(STORAGE_KEYS.progress, {}))
+  const [checkpoints, setCheckpoints] = useState(() => readStorage(STORAGE_KEYS.checkpoints, {}))
   const [notes, setNotes] = useState(() => readStorage(STORAGE_KEYS.notes, {}))
+  const [highlights, setHighlights] = useState(() => readStorage(STORAGE_KEYS.highlights, {}))
+  const [comments, setComments] = useState(() => readStorage(STORAGE_KEYS.comments, {}))
+  const [searchHistory, setSearchHistory] = useState(() => readStorage(STORAGE_KEYS.searchHistory, []))
   const [staff, setStaff] = useState(() => readStorage(STORAGE_KEYS.staff, []))
   const [selectedBook, setSelectedBook] = useState(null)
+  const [readerStartPage, setReaderStartPage] = useState(null)
   const [query, setQuery] = useState('')
   const [topic, setTopic] = useState('all')
-  const [readerTheme, setReaderTheme] = useState('paper')
+  const [readerTheme, setReaderTheme] = useState('sepia')
   const [fontScale, setFontScale] = useState(18)
   const [authForm, setAuthForm] = useState(emptyAuthForm)
   const [adminBook, setAdminBook] = useState(emptyAdminBook)
   const [knownUsers, setKnownUsers] = useState(() => readStorage(STORAGE_KEYS.accounts, []))
+  const activePage = pageState.activePage
+
+  const staffEmails = useMemo(() => staff.map((item) => item.email.toLowerCase()), [staff])
+  const getAccountRole = useCallback(
+    (email) => (ADMIN_EMAILS.includes(email) || staffEmails.includes(email) ? 'admin' : 'user'),
+    [staffEmails],
+  )
+
+  const navigateTo = useCallback((page, options = {}) => {
+    window.clearTimeout(routeTimerRef.current)
+
+    if (options.instant) {
+      dispatchPage({ type: 'instant', page })
+      return
+    }
+
+    dispatchPage({ type: 'start' })
+    routeTimerRef.current = window.setTimeout(() => {
+      dispatchPage({ type: 'finish', page })
+    }, 420)
+  }, [])
+
+  useEffect(() => {
+    return () => window.clearTimeout(routeTimerRef.current)
+  }, [])
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -72,17 +117,17 @@ function App() {
         id: user.uid,
         name: user.displayName || email.split('@')[0] || 'Reader',
         email,
-        role: ADMIN_EMAILS.includes(email) ? 'admin' : 'user',
+        role: getAccountRole(email),
       }
 
       setAccount(nextAccount)
       setKnownUsers((current) => upsertUser(current, nextAccount))
-      setActivePage(nextAccount.role === 'admin' ? 'admin' : 'home')
+      navigateTo(nextAccount.role === 'admin' ? 'admin' : 'home', { instant: true })
       setAuthReady(true)
     })
 
     return unsubscribe
-  }, [])
+  }, [getAccountRole, navigateTo])
 
   useEffect(() => {
     let ignore = false
@@ -96,7 +141,6 @@ function App() {
         const data = await response.json()
         if (!ignore) {
           setBooks(data.results?.length ? data.results : fallbackBooks)
-          setBooksNextUrl(data.next || '')
         }
       } catch {
         if (!ignore) setBooks(fallbackBooks)
@@ -114,8 +158,15 @@ function App() {
   useEffect(() => writeStorage(STORAGE_KEYS.library, localBooks), [localBooks])
   useEffect(() => writeStorage(STORAGE_KEYS.favorites, favorites), [favorites])
   useEffect(() => writeStorage(STORAGE_KEYS.history, history), [history])
+  useEffect(() => writeStorage(STORAGE_KEYS.readingActivity, readingActivity), [readingActivity])
+  useEffect(() => writeStorage(STORAGE_KEYS.views, viewCounts), [viewCounts])
+  useEffect(() => writeStorage(STORAGE_KEYS.readers, bookReaders), [bookReaders])
   useEffect(() => writeStorage(STORAGE_KEYS.progress, progress), [progress])
+  useEffect(() => writeStorage(STORAGE_KEYS.checkpoints, checkpoints), [checkpoints])
   useEffect(() => writeStorage(STORAGE_KEYS.notes, notes), [notes])
+  useEffect(() => writeStorage(STORAGE_KEYS.highlights, highlights), [highlights])
+  useEffect(() => writeStorage(STORAGE_KEYS.comments, comments), [comments])
+  useEffect(() => writeStorage(STORAGE_KEYS.searchHistory, searchHistory), [searchHistory])
   useEffect(() => writeStorage(STORAGE_KEYS.staff, staff), [staff])
   useEffect(() => writeStorage(STORAGE_KEYS.accounts, knownUsers), [knownUsers])
 
@@ -135,7 +186,7 @@ function App() {
     })
   }, [allBooks, query, topic])
 
-  async function handleAuth(event) {
+  const handleAuth = useCallback(async (event) => {
     event.preventDefault()
     setAuthError('')
     setAuthErrorField('')
@@ -164,9 +215,11 @@ function App() {
         await signInWithEmailAndPassword(auth, email, password)
       } catch (error) {
         const isAdminSeed = email === ADMIN_EMAIL && password === ADMIN_PASSWORD
-        if (!isAdminSeed || error.code !== 'auth/invalid-credential') throw error
+        const isStaffSeed = staffEmails.includes(email) && password === STAFF_DEFAULT_PASSWORD
+        if ((!isAdminSeed && !isStaffSeed) || error.code !== 'auth/invalid-credential') throw error
         const credential = await createUserWithEmailAndPassword(auth, email, password)
-        await updateProfile(credential.user, { displayName: 'BookWorm Admin' })
+        const staffAccount = staff.find((item) => item.email.toLowerCase() === email)
+        await updateProfile(credential.user, { displayName: staffAccount?.name || 'BookWorm Admin' })
       }
 
       setAuthForm(emptyAuthForm)
@@ -178,7 +231,7 @@ function App() {
     } finally {
       setAuthLoading(false)
     }
-  }
+  }, [authForm.email, authForm.name, authForm.password, authMode, staff, staffEmails])
 
   function updateAuthMode(nextMode) {
     setAuthMode(nextMode)
@@ -186,57 +239,117 @@ function App() {
     setAuthErrorField('')
   }
 
-  async function loadMoreBooks() {
-    if (!booksNextUrl || booksLoading) return
-
-    setBooksLoading(true)
-    try {
-      const response = await fetch(booksNextUrl)
-      if (!response.ok) throw new Error('Gutendex request failed')
-
-      const data = await response.json()
-      setBooks((current) => [...current, ...(data.results || [])])
-      setBooksNextUrl(data.next || '')
-    } catch {
-      setToast({ type: 'error', message: 'Could not load more books from Gutendex.' })
-    } finally {
-      setBooksLoading(false)
-    }
-  }
-
   async function handleLogout() {
     await signOut(auth)
     setAccount(guestAccount)
-    setActivePage('home')
+    navigateTo('home', { instant: true })
     setSelectedBook(null)
   }
 
   function goGuest() {
     setAccount(guestAccount)
-    setActivePage('home')
+    navigateTo('home', { instant: true })
   }
 
   function goAuth() {
     setAuthMode('login')
-    setActivePage('auth')
+    navigateTo('auth')
+  }
+
+  function rememberSearchTerm(term) {
+    const normalizedTerm = term.trim()
+    if (!normalizedTerm) return
+
+    setSearchHistory((current) => [
+      normalizedTerm,
+      ...current.filter((item) => item.toLowerCase() !== normalizedTerm.toLowerCase()),
+    ].slice(0, SEARCH_HISTORY_LIMIT))
+  }
+
+  function handleSearchSubmit(term) {
+    setQuery(term)
+    rememberSearchTerm(term)
   }
 
   function openDetail(book) {
     setSelectedBook(book)
-    setActivePage('detail')
+    navigateTo('detail')
   }
 
-  function openBook(book) {
+  function openBook(book, startPage = null) {
     setSelectedBook(book)
-    setActivePage('reader')
+    setReaderStartPage(startPage)
+    navigateTo('reader')
     setHistory((current) => [book.id, ...current.filter((id) => id !== book.id)].slice(0, 20))
-    setProgress((current) => ({ ...current, [book.id]: Math.max(current[book.id] || 0, 12) }))
+    setViewCounts((current) => ({ ...current, [book.id]: (current[book.id] || 0) + 1 }))
+    setBookReaders((current) => {
+      const accountKey = getAccountKey(account)
+      const readers = current[book.id] || []
+      if (readers.includes(accountKey)) return current
+      return { ...current, [book.id]: [...readers, accountKey] }
+    })
+    recordReadingDay()
+  }
+
+  function openChapter(book, chapter) {
+    if (account.role === 'guest' && chapter.number > 3) {
+      setToast({ type: 'error', message: 'Guest readers can preview the first 3 chapters. Login to continue.' })
+      goAuth()
+      return
+    }
+
+    openBook(book, chapter.startPage)
+  }
+
+  function recordReadingDay() {
+    const accountKey = getAccountKey(account)
+    const today = new Date().toISOString().slice(0, 10)
+    setReadingActivity((current) => {
+      const days = current[accountKey] || []
+      return days.includes(today) ? current : { ...current, [accountKey]: [today, ...days].slice(0, 90) }
+    })
+  }
+
+  function addHighlight(bookId, text, location) {
+    const trimmedText = text.trim()
+    if (!trimmedText) return
+
+    const nextHighlight = {
+      id: `highlight-${Date.now()}`,
+      bookId,
+      location,
+      text: trimmedText,
+      createdAt: new Date().toISOString(),
+    }
+
+    setHighlights((current) => ({
+      ...current,
+      [bookId]: [nextHighlight, ...(current[bookId] || [])].slice(0, 20),
+    }))
+  }
+
+  function addComment(bookId, text) {
+    const trimmedText = text.trim()
+    if (!trimmedText) return
+
+    const nextComment = {
+      id: `comment-${Date.now()}`,
+      author: account.role === 'guest' ? getGuestCommentName(bookId, comments[bookId]?.length || 0) : account.name,
+      role: account.role === 'guest' ? 'guest' : 'member',
+      text: trimmedText,
+      createdAt: new Date().toISOString(),
+    }
+
+    setComments((current) => ({
+      ...current,
+      [bookId]: [nextComment, ...(current[bookId] || [])].slice(0, 30),
+    }))
   }
 
   function toggleFavorite(bookId) {
     if (account.role === 'guest') {
       setToast({ type: 'error', message: 'Login to save books to your shelf.' })
-      setActivePage('auth')
+      navigateTo('auth')
       return
     }
 
@@ -269,7 +382,7 @@ function App() {
 
   function jumpPage(page, nextTopic) {
     if (nextTopic) setTopic(nextTopic)
-    setActivePage(page)
+    navigateTo(page)
   }
 
   if (!authReady) return <main className="loading-page">Checking your Firebase session...</main>
@@ -303,44 +416,67 @@ function App() {
         onRead={openBook}
         setPage={jumpPage}
         topics={topics}
+        viewCounts={viewCounts}
+        viewerCounts={getViewerCounts(bookReaders)}
+        progress={progress}
       />
     ),
     discover: (
       <DiscoverPage
         books={filteredBooks}
-        booksLoading={booksLoading}
-        canLoadMore={Boolean(booksNextUrl)}
         favorites={favorites}
-        onLoadMore={loadMoreBooks}
         onDetail={openDetail}
         onFavorite={toggleFavorite}
         onRead={openBook}
         query={query}
-        setQuery={setQuery}
+        searchableBooks={allBooks}
+        searchHistory={searchHistory}
+        onSearchSubmit={handleSearchSubmit}
         setTopic={setTopic}
         topic={topic}
         topics={topics}
+        viewCounts={viewCounts}
+        viewerCounts={getViewerCounts(bookReaders)}
       />
     ),
     detail: (
       <BookDetailPage
         book={selectedBook}
+        books={allBooks}
+        checkpoints={checkpoints}
+        account={account}
+        comments={comments[selectedBook?.id] || []}
         favorites={favorites}
-        onBack={() => setActivePage('discover')}
+        onBack={() => navigateTo('discover')}
+        onChapter={openChapter}
+        onComment={addComment}
+        onDetail={openDetail}
         onFavorite={toggleFavorite}
         onRead={openBook}
+        viewCount={selectedBook ? viewCounts[selectedBook.id] || 0 : 0}
+        viewCounts={viewCounts}
+        viewerCount={selectedBook ? bookReaders[selectedBook.id]?.length || 0 : 0}
+        viewerCounts={getViewerCounts(bookReaders)}
       />
     ),
     reader: (
       <ReaderPage
+        key={`${selectedBook?.id || 'empty-reader'}-${readerStartPage || 'checkpoint'}`}
         book={selectedBook}
+        account={account}
+        checkpoints={checkpoints}
         favorites={favorites}
+        highlights={highlights[selectedBook?.id] || []}
         fontScale={fontScale}
         notes={notes}
-        onBack={() => setActivePage('detail')}
+        onHighlight={addHighlight}
+        onBack={() => navigateTo('detail')}
         onFavorite={toggleFavorite}
+        onLoginRequired={goAuth}
         progress={progress}
         readerTheme={readerTheme}
+        startPage={readerStartPage}
+        setCheckpoints={setCheckpoints}
         setFontScale={setFontScale}
         setNotes={setNotes}
         setProgress={setProgress}
@@ -356,6 +492,9 @@ function App() {
         onRead={openBook}
         setPage={jumpPage}
         topics={topics}
+        viewCounts={viewCounts}
+        viewerCounts={getViewerCounts(bookReaders)}
+        progress={progress}
       />
     ) : (
       <ProfilePage
@@ -363,8 +502,12 @@ function App() {
         books={allBooks}
         favorites={favorites}
         history={history}
+        highlights={highlights}
         onRead={openBook}
         progress={progress}
+        readingDays={readingActivity[getAccountKey(account)] || []}
+        viewCounts={viewCounts}
+        viewerCounts={getViewerCounts(bookReaders)}
       />
     ),
     admin: account.role === 'admin' ? (
@@ -382,24 +525,39 @@ function App() {
     ) : null,
   }
 
+  const navigation = { activePage, isPageLoading: pageState.isPageLoading, navigateTo }
+
   return (
-    <AppShell
-      account={account}
-      activePage={activePage}
-      onAuth={goAuth}
-      onGuest={goGuest}
-      onLogout={handleLogout}
-      setActivePage={setActivePage}
-    >
-      <Suspense fallback={<PageFallback />}>{pages[activePage] || pages.home}</Suspense>
-      {toast && <AppToast message={toast.message} onClose={() => setToast(null)} type={toast.type} />}
-    </AppShell>
+    <NavigationProvider value={navigation}>
+      <AppShell account={account} onAuth={goAuth} onGuest={goGuest} onLogout={handleLogout}>
+        <Suspense fallback={<PageFallback />}>{pages[activePage] || pages.home}</Suspense>
+        {toast && <AppToast message={toast.message} onClose={() => setToast(null)} type={toast.type} />}
+      </AppShell>
+    </NavigationProvider>
   )
 }
 
 function upsertUser(users, user) {
   const stored = { email: user.email, name: user.name, role: user.role }
   return [stored, ...users.filter((item) => item.email !== user.email)]
+}
+
+function getAccountKey(account) {
+  if (!account || account.role === 'guest') return 'guest'
+  return account.id || account.email || 'user'
+}
+
+function getViewerCounts(bookReaders) {
+  return Object.fromEntries(Object.entries(bookReaders).map(([bookId, readers]) => [bookId, readers.length]))
+}
+
+function getGuestCommentName(bookId, commentIndex) {
+  const names = ['Anonymous Reader', 'Quiet Page-Turner', 'Midnight Visitor', 'Paper Trail Guest', 'Chapter Wanderer']
+  const seed = String(bookId)
+    .split('')
+    .reduce((total, letter) => total + letter.charCodeAt(0), commentIndex)
+  const index = Math.abs(seed) % names.length
+  return names[index]
 }
 
 function getAuthMessage(code) {
@@ -422,7 +580,7 @@ function getAuthMessage(code) {
 function PageFallback() {
   return (
     <div className="page-fallback">
-      <i className="bi bi-book" />
+      <img src={logo} alt="BookWorm logo" />
       <span>Loading page...</span>
     </div>
   )

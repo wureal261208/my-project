@@ -6,8 +6,15 @@ export const STORAGE_KEYS = {
   library: 'bookworm-local-library',
   favorites: 'bookworm-favorites',
   history: 'bookworm-history',
+  readingActivity: 'bookworm-reading-activity',
+  views: 'bookworm-views',
+  readers: 'bookworm-readers',
   progress: 'bookworm-progress',
+  checkpoints: 'bookworm-checkpoints',
   notes: 'bookworm-notes',
+  highlights: 'bookworm-highlights',
+  comments: 'bookworm-comments',
+  searchHistory: 'bookworm-search-history',
   staff: 'bookworm-staff',
 }
 
@@ -73,4 +80,5 @@ export const starterAccounts = [
 
 export const ADMIN_EMAIL = 'adminbookworm2026@gmail.com'
 export const ADMIN_PASSWORD = 'Admin123'
+export const STAFF_DEFAULT_PASSWORD = 'Admin123'
 export const ADMIN_EMAILS = [ADMIN_EMAIL]

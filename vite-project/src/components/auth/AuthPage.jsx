@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import logo from '../../assets/logo.jpg'
 
 function Icon({ name }) {
   const icons = {
     alert: 'bi-exclamation-circle',
     arrowLeft: 'bi-arrow-left',
-    book: 'bi-book',
+    loading: 'bi-arrow-repeat',
     eye: 'bi-eye',
     eyeOff: 'bi-eye-slash',
     lock: 'bi-lock',
@@ -15,6 +16,10 @@ function Icon({ name }) {
   }
 
   return <i aria-hidden="true" className={`auth-icon bi ${icons[name]}`} />
+}
+
+function LogoMark({ className = '' }) {
+  return <img alt="BookWorm logo" className={`logo-mark ${className}`} src={logo} />
 }
 
 function AuthPage({
@@ -205,7 +210,7 @@ function AuthPage({
             </div>
 
             <button className="auth-submit" type="submit" disabled={!isSignup || authLoading}>
-              <Icon name={authLoading && isSignup ? 'book' : 'userPlus'} />
+              {authLoading && isSignup ? <LogoMark className="button-logo" /> : <Icon name="userPlus" />}
               {authLoading && isSignup ? 'Creating account...' : 'Register now'}
             </button>
             <p>
@@ -277,7 +282,7 @@ function AuthPage({
             </div>
 
             <button className="auth-submit" type="submit" disabled={isSignup || authLoading}>
-              <Icon name={authLoading && !isSignup ? 'book' : 'logIn'} />
+              {authLoading && !isSignup ? <LogoMark className="button-logo" /> : <Icon name="logIn" />}
               {authLoading && !isSignup ? 'Logging in...' : 'Login now'}
             </button>
             <div className="auth-links">
@@ -299,13 +304,13 @@ function AuthPage({
 
       <section className="auth-content" aria-hidden="true">
         <div className="content-panel login-copy">
-          <span><Icon name="book" /></span>
+          <span><LogoMark /></span>
           <p>BookWorm Library</p>
           <h1>Welcome back</h1>
           <small>Continue your shelf, notes, and favorite stories in one clean reading space.</small>
         </div>
         <div className="content-panel signup-copy">
-          <span><Icon name="book" /></span>
+          <span><LogoMark /></span>
           <p>BookWorm Library</p>
           <h1>Join with us</h1>
           <small>Create an account to save favorites and build your own reading shelf.</small>

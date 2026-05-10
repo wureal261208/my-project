@@ -17,11 +17,11 @@ function AdminPage({
     const next = {
       id: Date.now(),
       name: form.get('name').trim(),
-      email: form.get('email').trim(),
+      email: form.get('email').trim().toLowerCase(),
       role: form.get('role'),
     }
     if (!next.name || !next.email) return
-    setStaff((current) => [next, ...current])
+    setStaff((current) => [next, ...current.filter((item) => item.email !== next.email)])
     event.currentTarget.reset()
   }
 
@@ -86,6 +86,9 @@ function AdminPage({
 
       <form className="admin-form compact-form" onSubmit={addStaff}>
         <h2>Create deputy dev / coop</h2>
+        <p className="form-note">
+          Staff created here can login with their email and default password <strong>Admin123</strong> to access Admin.
+        </p>
         <label>Name<input name="name" placeholder="Deputy name" /></label>
         <label>Email<input name="email" placeholder="deputy@bookworm.com" type="email" /></label>
         <label>
@@ -97,6 +100,21 @@ function AdminPage({
         </label>
         <button className="primary-button" type="submit">Create</button>
       </form>
+
+      <section className="admin-table staff-table">
+        <h2>Deputy dev / coop accounts</h2>
+        {staff.length ? (
+          staff.map((member) => (
+            <div className="table-row" key={member.email}>
+              <span>{member.name}</span>
+              <small>{member.email}</small>
+              <strong>{member.role}</strong>
+            </div>
+          ))
+        ) : (
+          <p>No deputy or coop accounts yet.</p>
+        )}
+      </section>
     </div>
   )
 }
