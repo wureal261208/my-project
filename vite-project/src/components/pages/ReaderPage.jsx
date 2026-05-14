@@ -16,7 +16,6 @@ function ReaderPage({
   onFavorite,
   onHighlight,
   onLoginRequired,
-  progress,
   readerTheme,
   startPage,
   setCheckpoints,
@@ -29,16 +28,22 @@ function ReaderPage({
   const [readerText, setReaderText] = useState('')
   const [readerStatus, setReaderStatus] = useState('idle')
   const [readerMessage, setReaderMessage] = useState('')
+  const [collapsedPageChapters, setCollapsedPageChapters] = useState({})
   const activeBook = useMemo(() => book || { id: 'empty', title: '', formats: {} }, [book])
   const readerUrl = getReaderUrl(activeBook)
   const readerTextUrl = getReaderTextUrl(activeBook)
   const totalPages = useMemo(() => getTotalPages(activeBook), [activeBook])
-  const chapters = useMemo(() => getBookChapters(activeBook, totalPages), [activeBook, totalPages])
+  const metadataChapters = useMemo(() => getBookChapters(activeBook, totalPages), [activeBook, totalPages])
+  const contentChapters = useMemo(
+    () => getContentChapters(activeBook, readerText, totalPages),
+    [activeBook, readerText, totalPages],
+  )
+  const chapters = contentChapters.length > 1 ? contentChapters : metadataChapters
   const readerPages = useMemo(() => buildReaderPages(readerText, chapters, totalPages), [chapters, readerText, totalPages])
   const checkpointKey = useMemo(() => getCheckpointKey(account, activeBook), [account, activeBook])
-  const savedCheckpoint = checkpoints[checkpointKey]
-  const [currentPage, setCurrentPage] = useState(() => clampPage(startPage || savedCheckpoint?.page || 1, totalPages))
   const isGuest = account?.role === 'guest'
+  const savedCheckpoint = isGuest ? null : checkpoints[checkpointKey]
+  const [currentPage, setCurrentPage] = useState(() => clampPage(startPage || savedCheckpoint?.page || 1, totalPages))
   const currentChapterIndex = getChapterIndex(currentPage, chapters)
   const currentChapter = chapters[currentChapterIndex]
   const currentChapterNumber = currentChapterIndex + 1
@@ -51,7 +56,7 @@ function ReaderPage({
 
   const saveCheckpoint = useCallback(
     (page = currentPage) => {
-      if (!book) return
+      if (!book || isGuest) return
 
       const safePage = clampPage(page, totalPages)
       const chapterIndex = getChapterIndex(safePage, chapters)
@@ -69,7 +74,7 @@ function ReaderPage({
       }))
       setProgress((current) => ({ ...current, [activeBook.id]: Math.min(100, Math.round((safePage / totalPages) * 100)) }))
     },
-    [activeBook.id, book, chapters, checkpointKey, currentPage, setCheckpoints, setProgress, totalPages],
+    [activeBook.id, book, chapters, checkpointKey, currentPage, isGuest, setCheckpoints, setProgress, totalPages],
   )
 
   useEffect(() => {
@@ -97,7 +102,7 @@ function ReaderPage({
     }
 
     const inlineText = getInlineBookText(activeBook)
-    const hasChapterContent = chapters.some((chapter) => chapter.content)
+    const hasChapterContent = metadataChapters.some((chapter) => chapter.content)
 
     if (inlineText) {
       commitReaderState(cleanBookText(inlineText), 'ready')
@@ -145,10 +150,10 @@ function ReaderPage({
     return () => {
       isCurrentRequest = false
     }
-  }, [activeBook, book, chapters, readerTextUrl])
+  }, [activeBook, book, metadataChapters, readerTextUrl])
 
   useEffect(() => {
-    if (!book) return
+    if (!book || isGuest) return
 
     const handleBeforeUnload = () => saveCheckpoint(currentPage)
     window.addEventListener('beforeunload', handleBeforeUnload)
@@ -156,7 +161,7 @@ function ReaderPage({
       saveCheckpoint(currentPage)
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [book, currentPage, saveCheckpoint])
+  }, [book, currentPage, isGuest, saveCheckpoint])
 
   if (!book) return <div className="empty-state">No book selected.</div>
 
@@ -180,8 +185,16 @@ function ReaderPage({
     handlePageChange(chapter.startPage + nextChapterPage - 1)
   }
 
+  function toggleChapterPages(chapterId) {
+    setCollapsedPageChapters((current) => ({ ...current, [chapterId]: !current[chapterId] }))
+  }
+
   function movePage(direction) {
     handlePageChange(currentPage + direction)
+  }
+
+  function changeFontScale(direction) {
+    setFontScale((current) => clampNumber(current + direction, 15, 24))
   }
 
   function handleExit() {
@@ -225,37 +238,25 @@ function ReaderPage({
         </label>
         <label>
           Font size
-          <input
-            type="range"
-            min="15"
-            max="24"
-            value={fontScale}
-            onChange={(event) => setFontScale(Number(event.target.value))}
-          />
+          <div className="reader-font-controls">
+            <button disabled={fontScale <= 15} onClick={() => changeFontScale(-1)} type="button">A-</button>
+            <span>{fontScale}px</span>
+            <button disabled={fontScale >= 24} onClick={() => changeFontScale(1)} type="button">A+</button>
+          </div>
         </label>
         <label>
           Chapter
           <select value={currentChapterIndex} onChange={(event) => goToChapter(Number(event.target.value))}>
             {chapters.map((chapter, index) => (
               <option key={chapter.id} value={index}>
-                {chapter.label}
+                {chapter.title === chapter.label ? chapter.label : `${chapter.label} · ${chapter.title}`}
               </option>
             ))}
           </select>
         </label>
-        <label>
-          Page in chapter
-          <input
-            type="range"
-            min="1"
-            max={currentChapter.pages}
-            value={chapterPage}
-            onChange={(event) => goToChapterPage(Number(event.target.value))}
-          />
-        </label>
         <div className="reader-page-meter">
           <span>{currentChapter.label} · Page {chapterPage} / {currentChapter.pages}</span>
-          <progress max="100" value={progress[book.id] || progressValue} />
+          <progress max="100" value={progressValue} />
           {isGuest && <small>Guest preview: first {GUEST_CHAPTER_LIMIT} chapters</small>}
           {isFinished && <small className="finished-status">Finished</small>}
         </div>
@@ -271,6 +272,7 @@ function ReaderPage({
             {chapters.map((chapter, index) => {
               const isLocked = isGuest && index + 1 > GUEST_CHAPTER_LIMIT
               const isActive = currentChapterIndex === index
+              const arePagesOpen = isActive && !collapsedPageChapters[chapter.id]
 
               return (
                 <div className={`chapter-nav-group ${isActive ? 'active' : ''}`} key={chapter.id}>
@@ -288,6 +290,18 @@ function ReaderPage({
                     {isLocked && <i className="bi bi-lock-fill" />}
                   </button>
                   {isActive && !isLocked && (
+                    <button
+                      aria-expanded={arePagesOpen}
+                      className="chapter-page-toggle"
+                      onClick={() => toggleChapterPages(chapter.id)}
+                      type="button"
+                    >
+                      <span>Page {chapterPage} / {chapter.pages}</span>
+                      <small>{chapter.pages} pages</small>
+                      <i className={`bi ${arePagesOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                    </button>
+                  )}
+                  {arePagesOpen && (
                     <div className="chapter-sidebar-pages" aria-label={`Pages in ${chapter.title}`}>
                       {Array.from({ length: chapter.pages }, (_, pageIndex) => pageIndex + 1).map((page) => (
                         <button
@@ -307,7 +321,7 @@ function ReaderPage({
             })}
           </nav>
         </aside>
-        <article className="reader-frame" style={{ fontSize: `${fontScale}px` }}>
+        <article className="reader-frame">
           <div className="reader-chapter-header">
             <div>
               <p className="mono-eyebrow">Reading section</p>
@@ -329,7 +343,7 @@ function ReaderPage({
               <p>Loading chapter text...</p>
             </div>
           ) : currentReaderParagraphs.length ? (
-            <div className="reader-text-page" aria-live="polite">
+            <div className="reader-text-page" aria-live="polite" style={{ fontSize: `${fontScale}px` }}>
               <p className="reader-page-kicker">{currentChapter.title} · Page {chapterPage}</p>
               {currentReaderParagraphs.map((paragraph, index) => (
                 <p key={`${currentPage}-${index}`}>{paragraph}</p>
@@ -361,7 +375,7 @@ function ReaderPage({
               <div>
                 <i className="bi bi-lock-fill" />
                 <h2>Login to keep reading</h2>
-                <p>Guest accounts can preview the first {GUEST_CHAPTER_LIMIT} chapters. Create or login to continue reading with unlimited checkpoints.</p>
+                <p>Guest accounts can preview the first {GUEST_CHAPTER_LIMIT} chapters. Create or login to continue reading with saved progress.</p>
                 <button className="primary-button" onClick={onLoginRequired} type="button">
                   <i className="bi bi-box-arrow-in-right" />
                   Login to continue
@@ -519,8 +533,8 @@ function buildReaderPages(text, chapters, totalPages) {
 
   const chapterBodies = splitTextByChapterHeadings(text)
 
-  if (chapterBodies.length > 1) {
-    const groupedChapters = groupEntries(chapterBodies, chapters.length)
+  if (chapterBodies.length >= chapters.length) {
+    const groupedChapters = groupEntries(chapterBodies.map((chapter) => chapter.content), chapters.length)
 
     return normalizePageCount(
       chapters.flatMap((chapter, index) => splitTextIntoPages(groupedChapters[index] || '', chapter.pages)),
@@ -531,44 +545,262 @@ function buildReaderPages(text, chapters, totalPages) {
   return splitTextIntoPages(text, totalPages)
 }
 
+function getContentChapters(book, text, totalPages) {
+  if (!text) return []
+
+  const detectedChapters = splitTextByChapterHeadings(text)
+  if (detectedChapters.length < 2) return []
+
+  const chapterSections =
+    detectedChapters.length > totalPages ? groupChapterSections(detectedChapters, totalPages) : detectedChapters
+  const pageCounts = distributePagesByContent(chapterSections, totalPages)
+  let startPage = 1
+
+  return chapterSections.map((chapter, index) => {
+    const pages = pageCounts[index]
+    const number = chapter.number || index + 1
+    const normalizedChapter = {
+      id: `${book.id || 'book'}-content-chapter-${index + 1}`,
+      label: `Chapter ${number}`,
+      number,
+      title: chapter.title || `Chapter ${number}`,
+      startPage,
+      pages,
+      content: chapter.content,
+    }
+
+    startPage += pages
+    return normalizedChapter
+  })
+}
+
 function splitTextByChapterHeadings(text) {
-  const headingPattern = /^\s*((chapter|letter|book|volume)\s+([ivxlcdm]+|\d+)\b.*|[ivxlcdm]+\.\s+[A-Z][A-Z0-9 ,;'":!?-]{4,})\s*$/gim
-  const matches = [...text.matchAll(headingPattern)]
+  const candidates = trimLeadingTableOfContents(getChapterHeadingCandidates(text))
 
-  if (matches.length < 2) return []
+  if (candidates.length < 2) return []
 
-  const bodies = matches.map((match, index) => {
-    const end = matches[index + 1]?.index ?? text.length
-    const prefix = index === 0 ? text.slice(0, match.index).trim() : ''
-    const body = text.slice(match.index, end).trim()
+  const chapters = candidates.map((candidate, index) => {
+    const end = candidates[index + 1]?.index ?? text.length
+    const prefix = index === 0 ? text.slice(0, candidate.index).trim() : ''
+    const body = text.slice(candidate.index, end).trim()
 
-    return [prefix, body].filter(Boolean).join('\n\n')
+    return {
+      number: candidate.number,
+      title: candidate.title,
+      content: [prefix, body].filter(Boolean).join('\n\n'),
+    }
   })
 
-  return bodies.filter((body) => body.length > 80)
+  return chapters.filter((chapter) => chapter.content.length > 80)
+}
+
+function getChapterHeadingCandidates(text) {
+  const lines = getIndexedLines(text)
+  const candidates = []
+
+  lines.forEach((line, index) => {
+    const inlineHeading = parseInlineChapterHeading(line.text)
+    if (inlineHeading) {
+      candidates.push({ ...inlineHeading, index: line.index })
+      return
+    }
+
+    const marker = parseStandaloneChapterMarker(line.text)
+    if (!marker) return
+
+    const nextLine = findNextNonEmptyLine(lines, index + 1)
+    if (!nextLine || !isLikelyStandaloneChapterTitle(nextLine.text)) return
+
+    const number = parseChapterNumber(marker)
+    candidates.push({
+      index: line.index,
+      number,
+      title: cleanHeadingTitle(nextLine.text.trim()) || `Chapter ${number || marker}`,
+    })
+  })
+
+  return candidates
+}
+
+function getIndexedLines(text) {
+  let index = 0
+
+  return text.split('\n').map((line) => {
+    const indexedLine = { index, text: line }
+    index += line.length + 1
+    return indexedLine
+  })
+}
+
+function parseInlineChapterHeading(line) {
+  const heading = line.trim()
+  if (!isReasonableHeadingLength(heading)) return null
+
+  const namedHeading = heading.match(/^(chapter|letter|book|volume)\s+([ivxlcdm]+|\d+)\b[).: -]*(.*)$/i)
+  if (namedHeading) {
+    const number = parseChapterNumber(namedHeading[2])
+    const title = cleanHeadingTitle(namedHeading[3]) || `${capitalizeWord(namedHeading[1])} ${namedHeading[2].toUpperCase()}`
+
+    return { number, title }
+  }
+
+  const numberedHeading = heading.match(/^([ivxlcdm]+|\d+)[.)]\s+(.+)$/i) || heading.match(/^([ivxlcdm]+|\d+)\s[-:]\s(.+)$/i)
+  if (!numberedHeading || !isLikelyInlineChapterTitle(numberedHeading[2])) return null
+
+  return {
+    number: parseChapterNumber(numberedHeading[1]),
+    title: cleanHeadingTitle(numberedHeading[2]),
+  }
+}
+
+function parseStandaloneChapterMarker(line) {
+  const marker = line.trim().match(/^([ivxlcdm]+|\d+)[.)]?$/i)?.[1]
+  return marker && parseChapterNumber(marker) ? marker : ''
+}
+
+function parseChapterNumber(value) {
+  if (/^\d+$/.test(value)) return Number(value)
+  return romanToNumber(value)
+}
+
+function romanToNumber(value) {
+  const romanValues = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 }
+  const letters = value.toLowerCase()
+  let total = 0
+
+  for (let index = 0; index < letters.length; index += 1) {
+    const current = romanValues[letters[index]]
+    const next = romanValues[letters[index + 1]] || 0
+    if (!current) return null
+    total += current < next ? -current : current
+  }
+
+  return total || null
+}
+
+function findNextNonEmptyLine(lines, startIndex) {
+  return lines.slice(startIndex).find((line) => line.text.trim())
+}
+
+function isReasonableHeadingLength(heading) {
+  return heading.length >= 1 && heading.length <= 110
+}
+
+function isLikelyInlineChapterTitle(title) {
+  const cleanTitle = cleanHeadingTitle(title)
+  if (!cleanTitle || cleanTitle.length < 4 || cleanTitle.length > 100) return false
+  if (/[.!?;:,]$/.test(cleanTitle) && cleanTitle.split(/\s+/).length > 8) return false
+
+  return true
+}
+
+function isLikelyStandaloneChapterTitle(title) {
+  const cleanTitle = cleanHeadingTitle(title)
+  if (!cleanTitle || cleanTitle.length < 4 || cleanTitle.length > 100) return false
+  if (/[.!?,;:]$/.test(cleanTitle)) return false
+
+  const letters = cleanTitle.replace(/[^a-z]/gi, '')
+  if (letters.length < 4) return false
+
+  const uppercaseLetters = letters.replace(/[^A-Z]/g, '').length
+  const uppercaseRatio = uppercaseLetters / letters.length
+
+  return uppercaseRatio > 0.58 || /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,10}$/.test(cleanTitle)
+}
+
+function trimLeadingTableOfContents(candidates) {
+  const restartIndexes = candidates
+    .map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate, index }) => index > 0 && candidate.number === 1 && (candidates[index - 1].number || 0) > 1)
+    .map(({ index }) => index)
+
+  const restartIndex = restartIndexes.reverse().find((index) => candidates.length - index >= 2)
+  return restartIndex ? candidates.slice(restartIndex) : candidates
+}
+
+function cleanHeadingTitle(title = '') {
+  return title
+    .replace(/\s+/g, ' ')
+    .replace(/^[).: -]+/, '')
+    .replace(/[).: -]+$/, '')
+    .trim()
+}
+
+function capitalizeWord(word) {
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+}
+
+function groupChapterSections(sections, targetCount) {
+  return Array.from({ length: targetCount }, (_, index) => {
+    const start = Math.floor((index * sections.length) / targetCount)
+    const end = Math.floor(((index + 1) * sections.length) / targetCount)
+    const group = sections.slice(start, Math.max(start + 1, end))
+    const firstChapter = group[0]
+
+    return {
+      number: firstChapter.number || index + 1,
+      title: firstChapter.title,
+      content: group.map((chapter) => chapter.content).join('\n\n'),
+    }
+  })
+}
+
+function distributePagesByContent(chapters, totalPages) {
+  const chapterCount = Math.max(1, Math.min(chapters.length, totalPages))
+  const availablePages = Math.max(0, totalPages - chapterCount)
+  const totalLength = chapters.reduce((total, chapter) => total + Math.max(1, chapter.content.length), 0)
+  const weightedPages = chapters.map((chapter) => {
+    const weight = Math.max(1, chapter.content.length) / totalLength
+    const exactExtraPages = weight * availablePages
+
+    return {
+      pages: 1 + Math.floor(exactExtraPages),
+      remainder: exactExtraPages % 1,
+    }
+  })
+
+  let assignedPages = weightedPages.reduce((total, chapter) => total + chapter.pages, 0)
+  weightedPages
+    .map((chapter, index) => ({ ...chapter, index }))
+    .sort((first, second) => second.remainder - first.remainder)
+    .forEach((chapter) => {
+      if (assignedPages >= totalPages) return
+      weightedPages[chapter.index].pages += 1
+      assignedPages += 1
+    })
+
+  return weightedPages.map((chapter) => chapter.pages)
 }
 
 function groupEntries(entries, targetCount) {
-  return Array.from({ length: targetCount }, (_, index) => {
-    const start = Math.floor((index * entries.length) / targetCount)
-    const end = Math.floor(((index + 1) * entries.length) / targetCount)
-    return entries.slice(start, Math.max(start + 1, end)).join('\n\n')
+  const groups = Array.from({ length: targetCount }, () => [])
+
+  entries.forEach((entry, index) => {
+    const groupIndex = Math.min(targetCount - 1, Math.floor((index * targetCount) / entries.length))
+    groups[groupIndex].push(entry)
   })
+
+  return groups.map((group) => group.join('\n\n'))
 }
 
 function splitTextIntoPages(text, pageCount) {
   const cleanText = text.replace(/\n{3,}/g, '\n\n').trim()
-  if (!cleanText) return Array.from({ length: pageCount }, () => '')
+  const safePageCount = Math.max(1, pageCount)
+  if (!cleanText) return Array.from({ length: safePageCount }, () => '')
 
-  const paragraphs = cleanText.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean)
-  const targetLength = Math.max(900, Math.ceil(cleanText.length / pageCount))
+  const targetLength = Math.max(360, Math.ceil(cleanText.length / safePageCount))
+  const paragraphs = cleanText
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .flatMap((paragraph) => splitLongParagraph(paragraph, targetLength))
   const pages = []
   let currentPageText = ''
 
   paragraphs.forEach((paragraph) => {
     const nextPageText = [currentPageText, paragraph].filter(Boolean).join('\n\n')
 
-    if (currentPageText && nextPageText.length > targetLength && pages.length < pageCount - 1) {
+    if (currentPageText && nextPageText.length > targetLength && pages.length < safePageCount - 1) {
       pages.push(currentPageText)
       currentPageText = paragraph
       return
@@ -579,7 +811,31 @@ function splitTextIntoPages(text, pageCount) {
 
   if (currentPageText || !pages.length) pages.push(currentPageText)
 
-  return normalizePageCount(pages, pageCount)
+  return normalizePageCount(pages, safePageCount)
+}
+
+function splitLongParagraph(paragraph, targetLength) {
+  if (paragraph.length <= targetLength * 1.35) return [paragraph]
+
+  const chunks = []
+  const words = paragraph.split(/\s+/)
+  let chunk = ''
+
+  words.forEach((word) => {
+    const nextChunk = [chunk, word].filter(Boolean).join(' ')
+
+    if (chunk && nextChunk.length > targetLength) {
+      chunks.push(chunk)
+      chunk = word
+      return
+    }
+
+    chunk = nextChunk
+  })
+
+  if (chunk) chunks.push(chunk)
+
+  return chunks
 }
 
 function normalizePageCount(pages, pageCount) {
@@ -624,6 +880,10 @@ function findMarkerIndex(text, markers) {
 
 function clampPage(page, totalPages) {
   return Math.min(totalPages, Math.max(1, Number(page) || 1))
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, Number(value) || min))
 }
 
 export default ReaderPage

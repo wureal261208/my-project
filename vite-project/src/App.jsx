@@ -32,7 +32,16 @@ const ProfilePage = lazy(() => import('./components/pages/ProfilePage'))
 const ReaderPage = lazy(() => import('./components/pages/ReaderPage'))
 
 const emptyAuthForm = { name: '', email: '', password: '' }
-const emptyAdminBook = { title: '', author: '', category: '', readerUrl: '', cover: '' }
+const emptyAdminBook = {
+  title: '',
+  author: '',
+  category: '',
+  readerUrl: '',
+  cover: '',
+  pageCount: '',
+  chapterCount: '',
+  readerText: '',
+}
 const guestAccount = { id: 'guest', name: 'None Account', email: 'guest@bookworm.local', role: 'guest' }
 const pageInitialState = { activePage: 'home', isPageLoading: false }
 const SEARCH_HISTORY_LIMIT = 8
@@ -271,16 +280,7 @@ function App() {
     rememberSearchTerm(term)
   }
 
-  function openDetail(book) {
-    setSelectedBook(book)
-    navigateTo('detail')
-  }
-
-  function openBook(book, startPage = null) {
-    setSelectedBook(book)
-    setReaderStartPage(startPage)
-    navigateTo('reader')
-    setHistory((current) => [book.id, ...current.filter((id) => id !== book.id)].slice(0, 20))
+  function recordBookView(book) {
     setViewCounts((current) => ({ ...current, [book.id]: (current[book.id] || 0) + 1 }))
     setBookReaders((current) => {
       const accountKey = getAccountKey(account)
@@ -288,7 +288,23 @@ function App() {
       if (readers.includes(accountKey)) return current
       return { ...current, [book.id]: [...readers, accountKey] }
     })
-    recordReadingDay()
+  }
+
+  function openDetail(book) {
+    setSelectedBook(book)
+    recordBookView(book)
+    navigateTo('detail')
+  }
+
+  function openBook(book, startPage = null) {
+    setSelectedBook(book)
+    setReaderStartPage(startPage)
+    navigateTo('reader')
+    if (account.role !== 'guest') {
+      setHistory((current) => [book.id, ...current.filter((id) => id !== book.id)].slice(0, 20))
+      recordReadingDay()
+    }
+    if (activePage !== 'detail') recordBookView(book)
   }
 
   function openChapter(book, chapter) {
@@ -362,16 +378,25 @@ function App() {
     event.preventDefault()
     if (!adminBook.title.trim()) return
 
+    const cover = adminBook.cover.trim()
+    const readerText = adminBook.readerText.trim()
+    const readerUrl = adminBook.readerUrl.trim()
+    const pageCount = getPositiveInteger(adminBook.pageCount)
+    const chapterCount = getPositiveInteger(adminBook.chapterCount)
+
     const nextBook = {
       ...adminBook,
       id: `local-${Date.now()}`,
       title: adminBook.title.trim(),
       author: adminBook.author.trim() || 'BookWorm editor',
       category: adminBook.category.trim() || 'Admin pick',
+      ...(pageCount ? { pageCount } : {}),
+      ...(chapterCount ? { chapterCount } : {}),
+      ...(readerText ? { readerText } : {}),
       download_count: 0,
       formats: {
-        'image/jpeg': adminBook.cover.trim(),
-        'text/html': adminBook.readerUrl.trim(),
+        ...(cover ? { 'image/jpeg': cover } : {}),
+        ...(readerUrl ? { [getReaderFormatKey(readerUrl)]: readerUrl } : {}),
       },
     }
 
@@ -406,6 +431,8 @@ function App() {
     )
   }
 
+  const visibleProgress = account.role === 'guest' ? {} : progress
+
   const pages = {
     home: (
       <HomePage
@@ -418,7 +445,7 @@ function App() {
         topics={topics}
         viewCounts={viewCounts}
         viewerCounts={getViewerCounts(bookReaders)}
-        progress={progress}
+        progress={visibleProgress}
       />
     ),
     discover: (
@@ -473,7 +500,6 @@ function App() {
         onBack={() => navigateTo('detail')}
         onFavorite={toggleFavorite}
         onLoginRequired={goAuth}
-        progress={progress}
         readerTheme={readerTheme}
         startPage={readerStartPage}
         setCheckpoints={setCheckpoints}
@@ -494,7 +520,7 @@ function App() {
         topics={topics}
         viewCounts={viewCounts}
         viewerCounts={getViewerCounts(bookReaders)}
-        progress={progress}
+        progress={visibleProgress}
       />
     ) : (
       <ProfilePage
@@ -504,7 +530,7 @@ function App() {
         history={history}
         highlights={highlights}
         onRead={openBook}
-        progress={progress}
+        progress={visibleProgress}
         readingDays={readingActivity[getAccountKey(account)] || []}
         viewCounts={viewCounts}
         viewerCounts={getViewerCounts(bookReaders)}
@@ -558,6 +584,15 @@ function getGuestCommentName(bookId, commentIndex) {
     .reduce((total, letter) => total + letter.charCodeAt(0), commentIndex)
   const index = Math.abs(seed) % names.length
   return names[index]
+}
+
+function getPositiveInteger(value) {
+  const number = Number(value)
+  return Number.isFinite(number) && number > 0 ? Math.floor(number) : null
+}
+
+function getReaderFormatKey(readerUrl) {
+  return /\.txt($|\?)/i.test(readerUrl) ? 'text/plain' : 'text/html'
 }
 
 function getAuthMessage(code) {

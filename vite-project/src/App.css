@@ -1989,7 +1989,7 @@ progress {
 }
 
 .reader-controls {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr) minmax(170px, 0.75fr) minmax(220px, 1fr);
 }
 
 .reader-main {
@@ -2087,10 +2087,43 @@ progress {
   font-weight: 900;
 }
 
+.chapter-page-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #e2e2dd;
+  border-radius: 7px;
+  background: #f4f4f0;
+  color: #30302d;
+  font-size: 12px;
+  font-weight: 950;
+  text-align: left;
+}
+
+.chapter-page-toggle:hover {
+  border-color: #16a09a;
+  color: #0f827d;
+}
+
+.chapter-page-toggle small {
+  color: #777771;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.chapter-page-toggle i {
+  color: inherit;
+}
+
 .chapter-sidebar-pages {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
   gap: 6px;
+  max-height: 160px;
+  overflow: auto;
   padding: 8px;
   border: 1px solid #e2e2dd;
   border-radius: 8px;
@@ -2140,7 +2173,29 @@ progress {
   background: #151515;
 }
 
+.reader-night .chapter-page-toggle {
+  border-color: #303030;
+  background: #181818;
+  color: #f2f2ed;
+}
+
+.reader-night .chapter-page-toggle:hover {
+  border-color: #16a09a;
+  color: #9ff0ea;
+}
+
+.reader-night .chapter-page-toggle small {
+  color: #bdbdb4;
+}
+
 .reader-night .chapter-sidebar-pages button {
+  border-color: #303030;
+  background: #202020;
+  color: #f2f2ed;
+}
+
+.reader-night .reader-font-controls button,
+.reader-night .reader-font-controls span {
   border-color: #303030;
   background: #202020;
   color: #f2f2ed;
@@ -2253,6 +2308,30 @@ progress {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.reader-font-controls {
+  display: grid;
+  grid-template-columns: 42px minmax(62px, 1fr) 42px;
+  gap: 6px;
+  align-items: center;
+}
+
+.reader-font-controls button,
+.reader-font-controls span {
+  display: grid;
+  height: 44px;
+  place-items: center;
+  border: 1px solid #d8d8d3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111111;
+  font-weight: 950;
+}
+
+.reader-font-controls button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .reader-page-actions button,

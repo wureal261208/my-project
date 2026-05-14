@@ -39,7 +39,7 @@ function BookDetailPage({
   const readingTime = Math.max(1, Math.round(totalPages * 2.2))
   const rating = Math.min(5, Math.max(3.8, (book.download_count || 1000) / 25000 + 3.6)).toFixed(1)
   const checkpointKey = getCheckpointKey(account, book)
-  const checkpoint = checkpoints[checkpointKey]
+  const checkpoint = account?.role === 'guest' ? null : checkpoints[checkpointKey]
   const recommendations = books
     .filter((item) => item.id !== book.id)
     .map((item) => ({

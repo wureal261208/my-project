@@ -1,5 +1,15 @@
 import { getAuthor } from '../../utils/bookUtils'
 
+const adminBookFields = [
+  { name: 'title', label: 'Title' },
+  { name: 'author', label: 'Author' },
+  { name: 'category', label: 'Category' },
+  { name: 'readerUrl', label: 'Reader URL', placeholder: 'https://...' },
+  { name: 'cover', label: 'Cover URL', placeholder: 'https://...' },
+  { name: 'pageCount', label: 'Total pages', placeholder: '120', type: 'number' },
+  { name: 'chapterCount', label: 'Chapters', placeholder: '12', type: 'number' },
+]
+
 function AdminPage({
   addLocalBook,
   adminBook,
@@ -40,16 +50,26 @@ function AdminPage({
 
       <form className="admin-form" onSubmit={addLocalBook}>
         <h2>Push new book</h2>
-        {['title', 'author', 'category', 'readerUrl', 'cover'].map((field) => (
-          <label key={field}>
-            {field === 'readerUrl' ? 'Reader URL' : field}
+        {adminBookFields.map((field) => (
+          <label key={field.name}>
+            {field.label}
             <input
-              value={adminBook[field]}
-              onChange={(event) => setAdminBook({ ...adminBook, [field]: event.target.value })}
-              placeholder={field === 'cover' || field === 'readerUrl' ? 'https://...' : ''}
+              min={field.type === 'number' ? '1' : undefined}
+              type={field.type || 'text'}
+              value={adminBook[field.name]}
+              onChange={(event) => setAdminBook({ ...adminBook, [field.name]: event.target.value })}
+              placeholder={field.placeholder || ''}
             />
           </label>
         ))}
+        <label>
+          Reader text
+          <textarea
+            value={adminBook.readerText}
+            onChange={(event) => setAdminBook({ ...adminBook, readerText: event.target.value })}
+            placeholder="Paste plain book text here to split it into chapters without an external reader URL."
+          />
+        </label>
         <button className="primary-button" type="submit">
           <i className="bi bi-cloud-upload" />
           Add book

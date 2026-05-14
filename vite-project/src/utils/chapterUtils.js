@@ -89,10 +89,10 @@ function normalizeExplicitChapters(book, entries, totalPages) {
   return seeds.map((chapter, index) => {
     const nextStartPage = seeds.slice(index + 1).find((nextChapter) => nextChapter.startPage)?.startPage
     const chapterStartPage = chapter.startPage || startPage
-    const inferredPages = nextStartPage ? nextStartPage - chapterStartPage : null
+    const inferredPages = nextStartPage && nextStartPage > chapterStartPage ? nextStartPage - chapterStartPage : null
     const isLastChapter = index === seeds.length - 1
     const remainingPages = Math.max(1, totalPages - chapterStartPage + 1)
-    const pages = Math.max(1, chapter.pages || inferredPages || (isLastChapter ? remainingPages : 1))
+    const pages = Math.min(remainingPages, Math.max(1, chapter.pages || inferredPages || (isLastChapter ? remainingPages : 1)))
     const normalizedChapter = createChapter(book, chapter, index, chapterStartPage, pages)
 
     startPage = chapterStartPage + pages
@@ -121,7 +121,7 @@ function createChapter(book, seed = {}, index, startPage, pages) {
   const title = seed.title || `Chapter ${number}`
 
   return {
-    id: `${book.id || 'book'}-chapter-${number}`,
+    id: `${book.id || 'book'}-chapter-${index + 1}`,
     label: `Chapter ${number}`,
     number,
     title,
