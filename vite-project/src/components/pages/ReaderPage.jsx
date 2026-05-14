@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getReaderUrl } from '../../utils/bookUtils'
+import { getBookChapters, getChapterIndex, getTotalPages } from '../../utils/chapterUtils'
 
 const GUEST_CHAPTER_LIMIT = 3
-const DEFAULT_TOTAL_PAGES = 120
-const DEFAULT_TOTAL_CHAPTERS = 12
 
 function ReaderPage({
   account,
@@ -27,10 +26,15 @@ function ReaderPage({
   setReaderTheme,
 }) {
   const [quoteText, setQuoteText] = useState('')
+  const [readerText, setReaderText] = useState('')
+  const [readerStatus, setReaderStatus] = useState('idle')
+  const [readerMessage, setReaderMessage] = useState('')
   const activeBook = useMemo(() => book || { id: 'empty', title: '', formats: {} }, [book])
   const readerUrl = getReaderUrl(activeBook)
+  const readerTextUrl = getReaderTextUrl(activeBook)
   const totalPages = useMemo(() => getTotalPages(activeBook), [activeBook])
-  const chapters = useMemo(() => getChapters(activeBook, totalPages), [activeBook, totalPages])
+  const chapters = useMemo(() => getBookChapters(activeBook, totalPages), [activeBook, totalPages])
+  const readerPages = useMemo(() => buildReaderPages(readerText, chapters, totalPages), [chapters, readerText, totalPages])
   const checkpointKey = useMemo(() => getCheckpointKey(account, activeBook), [account, activeBook])
   const savedCheckpoint = checkpoints[checkpointKey]
   const [currentPage, setCurrentPage] = useState(() => clampPage(startPage || savedCheckpoint?.page || 1, totalPages))
@@ -42,18 +46,23 @@ function ReaderPage({
   const hasReachedGuestLimit = isGuest && currentChapterNumber > GUEST_CHAPTER_LIMIT
   const isFinished = currentPage >= totalPages
   const progressValue = Math.round((currentPage / totalPages) * 100)
+  const currentReaderText = readerPages[currentPage - 1] || ''
+  const currentReaderParagraphs = useMemo(() => getDisplayParagraphs(currentReaderText), [currentReaderText])
 
   const saveCheckpoint = useCallback(
     (page = currentPage) => {
       if (!book) return
 
       const safePage = clampPage(page, totalPages)
+      const chapterIndex = getChapterIndex(safePage, chapters)
+      const checkpointChapter = chapters[chapterIndex]
+
       setCheckpoints((current) => ({
         ...current,
         [checkpointKey]: {
           page: safePage,
-          chapter: getChapterIndex(safePage, chapters) + 1,
-          chapterPage: safePage - chapters[getChapterIndex(safePage, chapters)].startPage + 1,
+          chapter: checkpointChapter.number || chapterIndex + 1,
+          chapterPage: safePage - checkpointChapter.startPage + 1,
           totalPages,
           updatedAt: new Date().toISOString(),
         },
@@ -67,6 +76,76 @@ function ReaderPage({
     if (!book) return
     saveCheckpoint(currentPage)
   }, [book, currentPage, saveCheckpoint])
+
+  useEffect(() => {
+    let isCurrentRequest = true
+    const commitReaderState = (text, status, message = '') => {
+      queueMicrotask(() => {
+        if (!isCurrentRequest) return
+
+        setReaderText(text)
+        setReaderStatus(status)
+        setReaderMessage(message)
+      })
+    }
+
+    if (!book) {
+      commitReaderState('', 'idle')
+      return () => {
+        isCurrentRequest = false
+      }
+    }
+
+    const inlineText = getInlineBookText(activeBook)
+    const hasChapterContent = chapters.some((chapter) => chapter.content)
+
+    if (inlineText) {
+      commitReaderState(cleanBookText(inlineText), 'ready')
+      return () => {
+        isCurrentRequest = false
+      }
+    }
+
+    if (hasChapterContent) {
+      commitReaderState('', 'ready')
+      return () => {
+        isCurrentRequest = false
+      }
+    }
+
+    if (!readerTextUrl) {
+      commitReaderState('', 'missing', 'This book does not include readable text for chapter pages.')
+      return () => {
+        isCurrentRequest = false
+      }
+    }
+
+    async function loadReaderText() {
+      commitReaderState('', 'loading')
+
+      try {
+        const response = await fetch(getFetchableReaderUrl(readerTextUrl))
+        if (!response.ok) throw new Error(`Reader source returned ${response.status}`)
+
+        const source = await response.text()
+        const text = cleanBookText(isHtmlReaderSource(readerTextUrl, response) ? htmlToText(source) : source)
+
+        if (!isCurrentRequest) return
+
+        commitReaderState(text, text ? 'ready' : 'missing', text ? '' : 'This reader source did not include readable text.')
+      } catch {
+        if (!isCurrentRequest) return
+
+        commitReaderState('', 'error', 'Could not load text for sliced chapter pages. Open the original reader instead.')
+      }
+    }
+
+    loadReaderText()
+
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [activeBook, book, chapters, readerTextUrl])
 
   useEffect(() => {
     if (!book) return
@@ -95,6 +174,10 @@ function ReaderPage({
 
   function goToChapterPage(nextChapterPage) {
     handlePageChange(currentChapter.startPage + nextChapterPage - 1)
+  }
+
+  function goToSidebarPage(chapter, nextChapterPage) {
+    handlePageChange(chapter.startPage + nextChapterPage - 1)
   }
 
   function movePage(direction) {
@@ -184,21 +267,42 @@ function ReaderPage({
             <p className="mono-eyebrow">Contents</p>
             <h2>Chapters</h2>
           </div>
-          <nav aria-label="Book chapters">
+          <nav aria-label="Book chapters" className="chapter-list">
             {chapters.map((chapter, index) => {
               const isLocked = isGuest && index + 1 > GUEST_CHAPTER_LIMIT
+              const isActive = currentChapterIndex === index
 
               return (
-                <button
-                  className={currentChapterIndex === index ? 'active' : ''}
-                  key={chapter.id}
-                  onClick={() => goToChapter(index)}
-                  type="button"
-                >
-                  <span>{index + 1}</span>
-                  <strong>{chapter.title}</strong>
-                  {isLocked ? <i className="bi bi-lock-fill" /> : <small>{chapter.pages} pages</small>}
-                </button>
+                <div className={`chapter-nav-group ${isActive ? 'active' : ''}`} key={chapter.id}>
+                  <button
+                    aria-expanded={isActive}
+                    className={`chapter-nav-button ${isActive ? 'active' : ''}`}
+                    onClick={() => goToChapter(index)}
+                    type="button"
+                  >
+                    <span className="chapter-nav-number">{chapter.number || index + 1}</span>
+                    <span className="chapter-nav-copy">
+                      <strong>{chapter.title}</strong>
+                      <small>{isLocked ? `starts page ${chapter.startPage}` : `${chapter.pages} pages · starts page ${chapter.startPage}`}</small>
+                    </span>
+                    {isLocked && <i className="bi bi-lock-fill" />}
+                  </button>
+                  {isActive && !isLocked && (
+                    <div className="chapter-sidebar-pages" aria-label={`Pages in ${chapter.title}`}>
+                      {Array.from({ length: chapter.pages }, (_, pageIndex) => pageIndex + 1).map((page) => (
+                        <button
+                          aria-label={`${chapter.title}, page ${page}`}
+                          className={chapterPage === page ? 'active' : ''}
+                          key={`${chapter.id}-page-${page}`}
+                          onClick={() => goToSidebarPage(chapter, page)}
+                          type="button"
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )
             })}
           </nav>
@@ -219,8 +323,24 @@ function ReaderPage({
               </button>
             </div>
           </div>
-          {readerUrl ? (
-            <iframe loading="lazy" src={readerUrl} title={`Read ${activeBook.title}`} />
+          {readerStatus === 'loading' ? (
+            <div className="reader-text-state">
+              <span className="reader-spinner" />
+              <p>Loading chapter text...</p>
+            </div>
+          ) : currentReaderParagraphs.length ? (
+            <div className="reader-text-page" aria-live="polite">
+              <p className="reader-page-kicker">{currentChapter.title} · Page {chapterPage}</p>
+              {currentReaderParagraphs.map((paragraph, index) => (
+                <p key={`${currentPage}-${index}`}>{paragraph}</p>
+              ))}
+            </div>
+          ) : readerUrl ? (
+            <div className="reader-source-fallback">
+              <p>{readerMessage || 'Readable text is not available for this generated page.'}</p>
+              <a href={readerUrl} rel="noreferrer" target="_blank">Open original reader</a>
+              <iframe loading="lazy" src={readerUrl} title={`Read ${activeBook.title}`} />
+            </div>
           ) : (
             <p>This book does not include a readable text link.</p>
           )}
@@ -293,36 +413,213 @@ function getCheckpointKey(account, book) {
   return `${accountKey}:${book.id}`
 }
 
-function getTotalPages(book) {
-  return Number(book.pageCount || book.page_count || book.pages || DEFAULT_TOTAL_PAGES)
+function getReaderTextUrl(book) {
+  const formats = book.formats || {}
+
+  return (
+    formats['text/plain; charset=utf-8'] ||
+    formats['text/plain'] ||
+    getProjectGutenbergTextUrl(book) ||
+    formats['text/html; charset=utf-8'] ||
+    formats['text/html'] ||
+    book.readerTextUrl ||
+    book.reader_text_url ||
+    book.readerUrl ||
+    ''
+  )
 }
 
-function getChapters(book, totalPages) {
-  const totalChapters = Number(book.chapterCount || book.chapter_count || book.chapters || DEFAULT_TOTAL_CHAPTERS)
-  const safeChapterCount = Math.max(1, Math.min(totalChapters, totalPages))
-  const basePages = Math.floor(totalPages / safeChapterCount)
-  const extraPages = totalPages % safeChapterCount
-  let startPage = 1
+function getProjectGutenbergTextUrl(book) {
+  const gutenbergId = getProjectGutenbergId(book)
+  return gutenbergId ? `https://www.gutenberg.org/cache/epub/${gutenbergId}/pg${gutenbergId}.txt` : ''
+}
 
-  return Array.from({ length: safeChapterCount }, (_, index) => {
-    const pages = basePages + (index < extraPages ? 1 : 0)
-    const chapter = {
-      id: `${book.id}-chapter-${index + 1}`,
-      label: `Chapter ${index + 1}`,
-      title: `Chapter ${index + 1}`,
-      startPage,
-      pages,
+function getProjectGutenbergId(book) {
+  const directId = Number(book.id)
+  if (Number.isInteger(directId) && directId > 0) return directId
+
+  const sourceUrls = [book.readerUrl, ...(Object.values(book.formats || {}))]
+  const urlMatch = sourceUrls
+    .filter(Boolean)
+    .map((url) => String(url).match(/gutenberg\.org\/(?:ebooks|files|cache\/epub)\/(\d+)/i)?.[1])
+    .find(Boolean)
+
+  return urlMatch ? Number(urlMatch) : null
+}
+
+function getInlineBookText(book) {
+  return [book.readerText, book.reader_text, book.content, book.text, book.body].find(
+    (value) => typeof value === 'string' && value.trim(),
+  ) || ''
+}
+
+function getFetchableReaderUrl(url) {
+  try {
+    const parsedUrl = new URL(url)
+
+    if (parsedUrl.hostname.endsWith('gutenberg.org')) {
+      return `/gutenberg${parsedUrl.pathname}${parsedUrl.search}`
     }
-    startPage += pages
-    return chapter
+  } catch {
+    return url
+  }
+
+  return url
+}
+
+function isHtmlReaderSource(url, response) {
+  const contentType = response.headers.get('content-type') || ''
+  return contentType.includes('text/html') || /\.html?($|\?)/i.test(url)
+}
+
+function htmlToText(source) {
+  const document = new DOMParser().parseFromString(source, 'text/html')
+  document.querySelectorAll('script, style, nav, header, footer').forEach((node) => node.remove())
+
+  return document.body?.textContent || ''
+}
+
+function cleanBookText(text) {
+  const normalizedText = text
+    .replace(/\r/g, '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+
+  const withoutHeader = sliceAfterMarker(normalizedText, [
+    '*** START OF THE PROJECT GUTENBERG EBOOK',
+    '*** START OF THIS PROJECT GUTENBERG EBOOK',
+    'START OF THE PROJECT GUTENBERG EBOOK',
+    'START OF THIS PROJECT GUTENBERG EBOOK',
+  ])
+  const withoutFooter = sliceBeforeMarker(withoutHeader, [
+    '*** END OF THE PROJECT GUTENBERG EBOOK',
+    '*** END OF THIS PROJECT GUTENBERG EBOOK',
+    'END OF THE PROJECT GUTENBERG EBOOK',
+    'END OF THIS PROJECT GUTENBERG EBOOK',
+  ])
+
+  return withoutFooter
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
+function buildReaderPages(text, chapters, totalPages) {
+  const chapterContent = chapters.some((chapter) => chapter.content)
+
+  if (chapterContent) {
+    return normalizePageCount(
+      chapters.flatMap((chapter) => splitTextIntoPages(cleanBookText(chapter.content || ''), chapter.pages)),
+      totalPages,
+    )
+  }
+
+  if (!text) return []
+
+  const chapterBodies = splitTextByChapterHeadings(text)
+
+  if (chapterBodies.length > 1) {
+    const groupedChapters = groupEntries(chapterBodies, chapters.length)
+
+    return normalizePageCount(
+      chapters.flatMap((chapter, index) => splitTextIntoPages(groupedChapters[index] || '', chapter.pages)),
+      totalPages,
+    )
+  }
+
+  return splitTextIntoPages(text, totalPages)
+}
+
+function splitTextByChapterHeadings(text) {
+  const headingPattern = /^\s*((chapter|letter|book|volume)\s+([ivxlcdm]+|\d+)\b.*|[ivxlcdm]+\.\s+[A-Z][A-Z0-9 ,;'":!?-]{4,})\s*$/gim
+  const matches = [...text.matchAll(headingPattern)]
+
+  if (matches.length < 2) return []
+
+  const bodies = matches.map((match, index) => {
+    const end = matches[index + 1]?.index ?? text.length
+    const prefix = index === 0 ? text.slice(0, match.index).trim() : ''
+    const body = text.slice(match.index, end).trim()
+
+    return [prefix, body].filter(Boolean).join('\n\n')
+  })
+
+  return bodies.filter((body) => body.length > 80)
+}
+
+function groupEntries(entries, targetCount) {
+  return Array.from({ length: targetCount }, (_, index) => {
+    const start = Math.floor((index * entries.length) / targetCount)
+    const end = Math.floor(((index + 1) * entries.length) / targetCount)
+    return entries.slice(start, Math.max(start + 1, end)).join('\n\n')
   })
 }
 
-function getChapterIndex(page, chapters) {
-  return Math.max(
-    0,
-    chapters.findIndex((chapter) => page >= chapter.startPage && page < chapter.startPage + chapter.pages),
-  )
+function splitTextIntoPages(text, pageCount) {
+  const cleanText = text.replace(/\n{3,}/g, '\n\n').trim()
+  if (!cleanText) return Array.from({ length: pageCount }, () => '')
+
+  const paragraphs = cleanText.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean)
+  const targetLength = Math.max(900, Math.ceil(cleanText.length / pageCount))
+  const pages = []
+  let currentPageText = ''
+
+  paragraphs.forEach((paragraph) => {
+    const nextPageText = [currentPageText, paragraph].filter(Boolean).join('\n\n')
+
+    if (currentPageText && nextPageText.length > targetLength && pages.length < pageCount - 1) {
+      pages.push(currentPageText)
+      currentPageText = paragraph
+      return
+    }
+
+    currentPageText = nextPageText
+  })
+
+  if (currentPageText || !pages.length) pages.push(currentPageText)
+
+  return normalizePageCount(pages, pageCount)
+}
+
+function normalizePageCount(pages, pageCount) {
+  const safePages = pages.slice(0, pageCount)
+
+  if (pages.length > pageCount) {
+    safePages[pageCount - 1] = [safePages[pageCount - 1], ...pages.slice(pageCount)].filter(Boolean).join('\n\n')
+  }
+
+  while (safePages.length < pageCount) {
+    safePages.push('')
+  }
+
+  return safePages
+}
+
+function getDisplayParagraphs(text) {
+  return text.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean)
+}
+
+function sliceAfterMarker(text, markers) {
+  const markerIndex = findMarkerIndex(text, markers)
+  if (markerIndex < 0) return text
+
+  const nextLineIndex = text.indexOf('\n', markerIndex)
+  return nextLineIndex >= 0 ? text.slice(nextLineIndex + 1) : text.slice(markerIndex)
+}
+
+function sliceBeforeMarker(text, markers) {
+  const markerIndex = findMarkerIndex(text, markers)
+  return markerIndex >= 0 ? text.slice(0, markerIndex) : text
+}
+
+function findMarkerIndex(text, markers) {
+  const lowerText = text.toLowerCase()
+  const indexes = markers
+    .map((marker) => lowerText.indexOf(marker.toLowerCase()))
+    .filter((index) => index >= 0)
+
+  return indexes.length ? Math.min(...indexes) : -1
 }
 
 function clampPage(page, totalPages) {

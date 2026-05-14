@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import BookGrid from '../books/BookGrid'
 import { getAuthor, getCategory, getCover, getDescription } from '../../utils/bookUtils'
+import { getBookChapters, getTotalPages } from '../../utils/chapterUtils'
 
 function BookDetailPage({
   account,
@@ -31,9 +32,9 @@ function BookDetailPage({
   }
 
   const totalReads = (book.download_count || 0) + viewCount
-  const totalPages = getDetailPages(book)
-  const totalChapters = getDetailChapters(book, totalPages)
-  const detailChapters = getDetailChapterList(book, totalPages)
+  const totalPages = getTotalPages(book)
+  const detailChapters = getBookChapters(book, totalPages)
+  const totalChapters = detailChapters.length
   const language = book.languages?.join(', ').toUpperCase() || 'EN'
   const readingTime = Math.max(1, Math.round(totalPages * 2.2))
   const rating = Math.min(5, Math.max(3.8, (book.download_count || 1000) / 25000 + 3.6)).toFixed(1)
@@ -225,34 +226,6 @@ function BookDetailPage({
 function getCheckpointKey(account, book) {
   const accountKey = account?.role === 'guest' ? 'guest' : account?.id || account?.email || 'user'
   return `${accountKey}:${book.id}`
-}
-
-function getDetailPages(book) {
-  return Number(book.pageCount || book.page_count || book.pages || 120)
-}
-
-function getDetailChapters(book, totalPages) {
-  return Math.max(1, Math.min(Number(book.chapterCount || book.chapter_count || book.chapters || 12), totalPages))
-}
-
-function getDetailChapterList(book, totalPages) {
-  const chapterCount = getDetailChapters(book, totalPages)
-  const basePages = Math.floor(totalPages / chapterCount)
-  const extraPages = totalPages % chapterCount
-  let startPage = 1
-
-  return Array.from({ length: chapterCount }, (_, index) => {
-    const pages = basePages + (index < extraPages ? 1 : 0)
-    const chapter = {
-      id: `${book.id}-detail-chapter-${index + 1}`,
-      number: index + 1,
-      title: `Chapter ${index + 1}`,
-      startPage,
-      pages,
-    }
-    startPage += pages
-    return chapter
-  })
 }
 
 export default BookDetailPage

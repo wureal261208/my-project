@@ -1994,7 +1994,7 @@ progress {
 
 .reader-main {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 250px;
+  grid-template-columns: 260px minmax(0, 1fr) 250px;
   gap: 12px;
   min-height: 0;
 }
@@ -2021,12 +2021,17 @@ progress {
   color: #111111;
 }
 
-.chapter-panel nav {
+.chapter-list {
   display: grid;
   gap: 8px;
 }
 
-.chapter-panel button {
+.chapter-nav-group {
+  display: grid;
+  gap: 6px;
+}
+
+.chapter-nav-button {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 10px;
@@ -2040,14 +2045,14 @@ progress {
   text-align: left;
 }
 
-.chapter-panel button.active,
-.chapter-panel button:hover {
+.chapter-nav-button.active,
+.chapter-nav-button:hover {
   border-color: #111111;
   background: #111111;
   color: #ffffff;
 }
 
-.chapter-panel button > span {
+.chapter-nav-number {
   display: grid;
   width: 34px;
   height: 34px;
@@ -2058,22 +2063,87 @@ progress {
   font-weight: 950;
 }
 
-.chapter-panel button.active > span,
-.chapter-panel button:hover > span {
+.chapter-nav-button.active .chapter-nav-number,
+.chapter-nav-button:hover .chapter-nav-number {
   background: #ffffff;
 }
 
-.chapter-panel strong {
+.chapter-nav-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chapter-nav-copy strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chapter-panel small,
-.chapter-panel i {
+.chapter-nav-button small,
+.chapter-nav-button i {
   color: inherit;
   font-size: 12px;
   font-weight: 900;
+}
+
+.chapter-sidebar-pages {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #e2e2dd;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.chapter-sidebar-pages button {
+  display: grid;
+  min-width: 0;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #d8d8d3;
+  border-radius: 6px;
+  background: #fbfbf8;
+  color: #111111;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.chapter-sidebar-pages button.active,
+.chapter-sidebar-pages button:hover {
+  border-color: #16a09a;
+  background: #16a09a;
+  color: #ffffff;
+}
+
+.reader-night .chapter-panel h2,
+.reader-night .reader-chapter-header h2 {
+  color: #f2f2ed;
+}
+
+.reader-night .chapter-nav-button {
+  border-color: #303030;
+  background: #202020;
+  color: #f2f2ed;
+}
+
+.reader-night .chapter-nav-button.active,
+.reader-night .chapter-nav-button:hover {
+  border-color: #f2f2ed;
+  background: #f2f2ed;
+  color: #111111;
+}
+
+.reader-night .chapter-sidebar-pages {
+  border-color: #303030;
+  background: #151515;
+}
+
+.reader-night .chapter-sidebar-pages button {
+  border-color: #303030;
+  background: #202020;
+  color: #f2f2ed;
 }
 
 .reader-page .reader-frame {
@@ -2087,6 +2157,85 @@ progress {
 
 .reader-page .reader-frame iframe {
   height: 100%;
+}
+
+.reader-text-page,
+.reader-text-state,
+.reader-source-fallback {
+  min-height: 0;
+  overflow: auto;
+  background: #ffffff;
+}
+
+.reader-text-page {
+  padding: 28px clamp(20px, 4vw, 54px);
+  color: #22221f;
+  line-height: 1.75;
+}
+
+.reader-text-page p {
+  max-width: 76ch;
+  margin: 0 auto 1em;
+}
+
+.reader-text-page .reader-page-kicker {
+  color: #777771;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.reader-text-state,
+.reader-source-fallback {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  padding: 28px;
+  color: #555550;
+  font-weight: 850;
+  text-align: center;
+}
+
+.reader-source-fallback {
+  grid-template-rows: auto auto minmax(320px, 1fr);
+  place-items: stretch center;
+}
+
+.reader-source-fallback p {
+  margin: 0;
+}
+
+.reader-source-fallback a {
+  color: #0f827d;
+  font-weight: 950;
+}
+
+.reader-source-fallback iframe {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  border: 0;
+}
+
+.reader-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #d8d8d3;
+  border-top-color: #16a09a;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.reader-night .reader-text-page,
+.reader-night .reader-text-state,
+.reader-night .reader-source-fallback {
+  background: #181818;
+  color: #f2f2ed;
+}
+
+.reader-night .reader-text-page .reader-page-kicker {
+  color: #bdbdb4;
 }
 
 .reader-chapter-header {
@@ -2568,6 +2717,12 @@ progress {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
