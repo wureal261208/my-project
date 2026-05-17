@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { getAuthor, getCover, getInitials } from '../../utils/bookUtils'
 
+const AVATAR_MAX_SIZE = 2 * 1024 * 1024
+const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const DISPLAY_NAME_MAX = 32
+const DISPLAY_NAME_MIN = 2
+const DISPLAY_NAME_PATTERN = /^[\p{L}\p{N} ._'-]+$/u
+
 function ProfilePage({
   account,
   books,
@@ -147,8 +153,15 @@ function ProfileSettings({
     const file = event.target.files?.[0]
     if (!file) return
 
-    if (!file.type.startsWith('image/')) {
-      setSettingsError('Please choose an image file.')
+    if (!AVATAR_TYPES.includes(file.type)) {
+      setSettingsError('Avatar must be a JPG, PNG, WEBP, or GIF image.')
+      event.target.value = ''
+      return
+    }
+
+    if (file.size > AVATAR_MAX_SIZE) {
+      setSettingsError('Avatar image must be 2MB or smaller.')
+      event.target.value = ''
       return
     }
 
@@ -162,15 +175,18 @@ function ProfileSettings({
 
   async function saveProfile(event) {
     event.preventDefault()
-    if (!displayName.trim()) {
-      setSettingsError('Display name cannot be empty.')
+    const nameError = validateDisplayName(displayName)
+    if (nameError) {
+      setSettingsError(nameError)
       return
     }
 
+    const normalizedDisplayName = normalizeDisplayName(displayName)
     setSettingsLoading(true)
     setSettingsError('')
     try {
-      await onProfileUpdate({ avatar: avatarPreview, displayName })
+      await onProfileUpdate({ avatar: avatarPreview, displayName: normalizedDisplayName })
+      setDisplayName(normalizedDisplayName)
     } catch {
       setSettingsError('Could not update your profile. Please try again.')
     } finally {
@@ -212,12 +228,23 @@ function ProfileSettings({
             <label className="file-picker">
               <i className="bi bi-image" />
               Change avatar
-              <input accept="image/*" type="file" onChange={handleAvatarChange} />
+              <input accept={AVATAR_TYPES.join(',')} type="file" onChange={handleAvatarChange} />
             </label>
+            <small>JPG, PNG, WEBP, or GIF. Max 2MB.</small>
           </div>
           <label>
             Display name
-            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+            <input
+              maxLength={DISPLAY_NAME_MAX}
+              value={displayName}
+              onChange={(event) => {
+                setDisplayName(event.target.value)
+                setSettingsError('')
+              }}
+            />
+            <span className="field-hint">
+              {displayName.length}/{DISPLAY_NAME_MAX} characters. Letters, numbers, spaces, . _ ' - only.
+            </span>
           </label>
           <button className="primary-button" disabled={settingsLoading} type="submit">
             <i className="bi bi-check2-circle" />
@@ -368,6 +395,23 @@ function getReadingStreak(days) {
   }
 
   return streak
+}
+
+function normalizeDisplayName(name) {
+  return name.trim().replace(/\s+/g, ' ')
+}
+
+function validateDisplayName(name) {
+  const normalizedName = normalizeDisplayName(name)
+
+  if (!normalizedName) return 'Display name cannot be empty.'
+  if (normalizedName.length < DISPLAY_NAME_MIN) return `Display name must be at least ${DISPLAY_NAME_MIN} characters.`
+  if (normalizedName.length > DISPLAY_NAME_MAX) return `Display name must be ${DISPLAY_NAME_MAX} characters or fewer.`
+  if (!DISPLAY_NAME_PATTERN.test(normalizedName)) {
+    return "Display name can only include letters, numbers, spaces, and . _ ' -"
+  }
+
+  return ''
 }
 
 export default ProfilePage

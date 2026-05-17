@@ -2893,6 +2893,18 @@ progress {
   font-size: 28px;
 }
 
+.avatar-editor small,
+.field-hint {
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.field-hint {
+  text-transform: none;
+}
+
 .file-picker {
   display: inline-flex;
   width: fit-content;

@@ -592,6 +592,7 @@ function App() {
         highlights={highlights}
         onProfileUpdate={updateAccountProfile}
         onRead={openBook}
+        onResetPassword={resetAccountPassword}
         progress={progress}
         readingDays={readingActivity[getAccountKey(account)] || []}
         readerTheme={readerTheme}
