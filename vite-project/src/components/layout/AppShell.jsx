@@ -9,13 +9,13 @@ const navItems = [
   { id: 'admin', label: 'Admin', icon: 'bi-shield-lock', admin: true },
 ]
 
-function AppShell({ account, children, onAuth, onGuest, onLogout }) {
+function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme = 'paper' }) {
   const { activePage, isPageLoading, navigateTo } = useNavigation()
   const isGuest = account?.role === 'guest'
   const displayName = account?.name || 'None Account'
 
   return (
-    <div className="book-app">
+    <div className={`book-app app-theme-${websiteTheme}`}>
       <header className="site-header">
         <button className="brand-button" onClick={() => navigateTo('home')} type="button">
           <img src={logo} alt="BookWorm logo" />
@@ -43,7 +43,9 @@ function AppShell({ account, children, onAuth, onGuest, onLogout }) {
 
         <div className="header-account">
           <button className="avatar-chip" onClick={() => (isGuest ? onAuth() : navigateTo('profile'))} type="button">
-            <span>{getInitials(displayName)}</span>
+            <span>
+              {account?.avatar ? <img src={account.avatar} alt="" /> : getInitials(displayName)}
+            </span>
             <strong>{displayName}</strong>
           </button>
           {isGuest ? (

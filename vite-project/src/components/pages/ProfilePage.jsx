@@ -1,6 +1,26 @@
+import { useState } from 'react'
 import { getAuthor, getCover, getInitials } from '../../utils/bookUtils'
 
-function ProfilePage({ account, books, favorites, highlights = {}, history, onRead, progress, readingDays = [], viewCounts }) {
+function ProfilePage({
+  account,
+  books,
+  favorites,
+  fontScale,
+  highlights = {},
+  history,
+  onProfileUpdate,
+  onRead,
+  onResetPassword,
+  progress,
+  readerTheme,
+  readingDays = [],
+  setFontScale,
+  setReaderTheme,
+  setWebsiteTheme,
+  viewCounts,
+  websiteTheme,
+}) {
+  const [activeTab, setActiveTab] = useState('overview')
   const savedBooks = books.filter((book) => favorites.includes(book.id))
   const readingBooks = books.filter((book) => (progress[book.id] || 0) > 0 && (progress[book.id] || 0) < 100)
   const finishedBooks = books.filter((book) => (progress[book.id] || 0) >= 100)
@@ -14,15 +34,84 @@ function ProfilePage({ account, books, favorites, highlights = {}, history, onRe
 
   return (
     <div className="profile-page">
-      <section className="profile-hero">
-        <div className="profile-avatar">{getInitials(account.name)}</div>
-        <div>
-          <p className="mono-eyebrow">My account</p>
-          <h1>{account.name}</h1>
-          <p>{account.email}</p>
-        </div>
-      </section>
+      <ProfileHero account={account} />
 
+      <div className="profile-tabs" role="tablist" aria-label="Profile sections">
+        {[
+          ['overview', 'Overview', 'bi-grid-1x2'],
+          ['settings', 'Settings', 'bi-sliders'],
+        ].map(([id, label, icon]) => (
+          <button
+            aria-selected={activeTab === id}
+            className={activeTab === id ? 'active' : ''}
+            key={id}
+            onClick={() => setActiveTab(id)}
+            role="tab"
+            type="button"
+          >
+            <i className={`bi ${icon}`} />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' ? (
+        <ProfileOverview
+          finishedBooks={finishedBooks}
+          highlightList={highlightList}
+          onRead={onRead}
+          progress={progress}
+          readingBooks={readingBooks}
+          recentBooks={recentBooks}
+          savedBooks={savedBooks}
+          streak={streak}
+          viewCounts={viewCounts}
+        />
+      ) : (
+        <ProfileSettings
+          account={account}
+          fontScale={fontScale}
+          onProfileUpdate={onProfileUpdate}
+          onResetPassword={onResetPassword}
+          readerTheme={readerTheme}
+          setFontScale={setFontScale}
+          setReaderTheme={setReaderTheme}
+          setWebsiteTheme={setWebsiteTheme}
+          websiteTheme={websiteTheme}
+        />
+      )}
+    </div>
+  )
+}
+
+function ProfileHero({ account }) {
+  return (
+    <section className="profile-hero">
+      <div className="profile-avatar">
+        {account.avatar ? <img src={account.avatar} alt="" /> : getInitials(account.name)}
+      </div>
+      <div>
+        <p className="mono-eyebrow">My account</p>
+        <h1>{account.name}</h1>
+        <p>{account.email}</p>
+      </div>
+    </section>
+  )
+}
+
+function ProfileOverview({
+  finishedBooks,
+  highlightList,
+  onRead,
+  progress,
+  readingBooks,
+  recentBooks,
+  savedBooks,
+  streak,
+  viewCounts,
+}) {
+  return (
+    <section className="profile-overview" role="tabpanel">
       <section className="metrics">
         <article><strong>{savedBooks.length}</strong><span>Saved books</span></article>
         <article><strong>{streak}</strong><span>Day streak</span></article>
@@ -34,18 +123,180 @@ function ProfilePage({ account, books, favorites, highlights = {}, history, onRe
       <ProfileShelf title="Currently reading" books={readingBooks} onRead={onRead} progress={progress} viewCounts={viewCounts} />
       <HighlightShelf highlights={highlightList} />
       <ProfileShelf title="History" books={recentBooks} onRead={onRead} progress={progress} viewCounts={viewCounts} />
+    </section>
+  )
+}
 
-      <section className="settings-panel">
-        <h2>Settings</h2>
-        <label>
-          Reader mode
-          <select defaultValue="sepia">
-            <option value="sepia">Sepia</option>
-            <option value="focus">Focus</option>
-            <option value="night">Night</option>
-          </select>
-        </label>
-      </section>
+function ProfileSettings({
+  account,
+  fontScale,
+  onProfileUpdate,
+  onResetPassword,
+  readerTheme,
+  setFontScale,
+  setReaderTheme,
+  setWebsiteTheme,
+  websiteTheme,
+}) {
+  const [avatarPreview, setAvatarPreview] = useState(account.avatar || '')
+  const [displayName, setDisplayName] = useState(account.name)
+  const [settingsError, setSettingsError] = useState('')
+  const [settingsLoading, setSettingsLoading] = useState(false)
+
+  function handleAvatarChange(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setSettingsError('Please choose an image file.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setAvatarPreview(String(reader.result))
+      setSettingsError('')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault()
+    if (!displayName.trim()) {
+      setSettingsError('Display name cannot be empty.')
+      return
+    }
+
+    setSettingsLoading(true)
+    setSettingsError('')
+    try {
+      await onProfileUpdate({ avatar: avatarPreview, displayName })
+    } catch {
+      setSettingsError('Could not update your profile. Please try again.')
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  async function sendResetPassword() {
+    setSettingsLoading(true)
+    setSettingsError('')
+    try {
+      await onResetPassword()
+    } catch {
+      setSettingsError('Could not send reset email right now.')
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  return (
+    <section className="settings-panel profile-settings" role="tabpanel">
+      <div className="settings-intro">
+        <div>
+          <p className="mono-eyebrow">Control center</p>
+          <h2>Account settings</h2>
+          <p>Keep your profile, password, reading comfort, and site appearance in one place.</p>
+        </div>
+        <div className="settings-mini-profile">
+          <span>{avatarPreview ? <img src={avatarPreview} alt="" /> : getInitials(displayName)}</span>
+          <strong>{displayName || account.name}</strong>
+        </div>
+      </div>
+
+      <div className="settings-layout">
+        <form className="account-settings-card profile-card-large" onSubmit={saveProfile}>
+          <SettingsHeading icon="bi-person-gear" kicker="Profile" title="Identity" />
+          <div className="avatar-editor">
+            <span>{avatarPreview ? <img src={avatarPreview} alt="" /> : getInitials(displayName || account.name)}</span>
+            <label className="file-picker">
+              <i className="bi bi-image" />
+              Change avatar
+              <input accept="image/*" type="file" onChange={handleAvatarChange} />
+            </label>
+          </div>
+          <label>
+            Display name
+            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+          </label>
+          <button className="primary-button" disabled={settingsLoading} type="submit">
+            <i className="bi bi-check2-circle" />
+            Save profile
+          </button>
+        </form>
+
+        <div className="account-settings-card">
+          <SettingsHeading icon="bi-shield-lock" kicker="Security" title="Password" />
+          <p className="settings-copy">Send a reset link to {account.email}.</p>
+          <button className="ghost-button" disabled={settingsLoading} onClick={sendResetPassword} type="button">
+            <i className="bi bi-envelope-arrow-up" />
+            Send reset email
+          </button>
+        </div>
+
+        <div className="account-settings-card reader-preview-card">
+          <SettingsHeading icon="bi-book" kicker="Reader" title="Preview mode" />
+          <div className="settings-two-col">
+            <label>
+              Reader mode
+              <select value={readerTheme} onChange={(event) => setReaderTheme(event.target.value)}>
+                <option value="sepia">Sepia</option>
+                <option value="focus">Focus</option>
+                <option value="night">Night</option>
+              </select>
+            </label>
+            <label>
+              Font size
+              <input
+                max="24"
+                min="15"
+                type="range"
+                value={fontScale}
+                onChange={(event) => setFontScale(Number(event.target.value))}
+              />
+            </label>
+          </div>
+          <div className={`settings-reader-preview reader-${readerTheme}`} style={{ fontSize: `${fontScale}px` }}>
+            <p className="mono-eyebrow">Chapter preview</p>
+            <h4>A quiet page for focused reading</h4>
+            <p>Reader mode and font size sync with the reading screen.</p>
+          </div>
+        </div>
+
+        <div className="account-settings-card">
+          <SettingsHeading icon="bi-palette" kicker="Appearance" title="Website theme" />
+          <div className="theme-options" role="group" aria-label="Website theme">
+            {[
+              ['paper', 'Paper'],
+              ['mint', 'Mint'],
+              ['ink', 'Ink'],
+            ].map(([value, label]) => (
+              <button
+                className={websiteTheme === value ? 'active' : ''}
+                key={value}
+                onClick={() => setWebsiteTheme(value)}
+                type="button"
+              >
+                <span className={`theme-swatch theme-swatch-${value}`} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {settingsError && <p className="settings-error">{settingsError}</p>}
+    </section>
+  )
+}
+
+function SettingsHeading({ icon, kicker, title }) {
+  return (
+    <div className="settings-card-heading">
+      <i className={`bi ${icon}`} />
+      <div>
+        <p className="mono-eyebrow">{kicker}</p>
+        <h3>{title}</h3>
+      </div>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, us
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -69,15 +70,18 @@ function App() {
   const [comments, setComments] = useState(() => readStorage(STORAGE_KEYS.comments, {}))
   const [searchHistory, setSearchHistory] = useState(() => readStorage(STORAGE_KEYS.searchHistory, []))
   const [staff, setStaff] = useState(() => readStorage(STORAGE_KEYS.staff, []))
+  const [accountSettings, setAccountSettings] = useState(() => readStorage(STORAGE_KEYS.accountSettings, {}))
   const [selectedBook, setSelectedBook] = useState(null)
   const [readerStartPage, setReaderStartPage] = useState(null)
   const [query, setQuery] = useState('')
   const [topic, setTopic] = useState('all')
   const [readerTheme, setReaderTheme] = useState('sepia')
+  const [websiteTheme, setWebsiteTheme] = useState(() => readStorage(STORAGE_KEYS.websiteTheme, 'paper'))
   const [fontScale, setFontScale] = useState(18)
   const [authForm, setAuthForm] = useState(emptyAuthForm)
   const [adminBook, setAdminBook] = useState(emptyAdminBook)
   const [knownUsers, setKnownUsers] = useState(() => readStorage(STORAGE_KEYS.accounts, []))
+  const accountSettingsRef = useRef(accountSettings)
   const activePage = pageState.activePage
 
   const staffEmails = useMemo(() => staff.map((item) => item.email.toLowerCase()), [staff])
@@ -105,6 +109,10 @@ function App() {
   }, [])
 
   useEffect(() => {
+    accountSettingsRef.current = accountSettings
+  }, [accountSettings])
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setAccount(guestAccount)
@@ -113,10 +121,13 @@ function App() {
       }
 
       const email = user.email?.toLowerCase() || ''
+      const savedSettings = accountSettingsRef.current[user.uid] || accountSettingsRef.current[email] || {}
+      if (savedSettings.websiteTheme) setWebsiteTheme(savedSettings.websiteTheme)
       const nextAccount = {
         id: user.uid,
-        name: user.displayName || email.split('@')[0] || 'Reader',
+        name: savedSettings.displayName || user.displayName || email.split('@')[0] || 'Reader',
         email,
+        avatar: savedSettings.avatar || user.photoURL || '',
         role: getAccountRole(email),
       }
 
@@ -168,7 +179,9 @@ function App() {
   useEffect(() => writeStorage(STORAGE_KEYS.comments, comments), [comments])
   useEffect(() => writeStorage(STORAGE_KEYS.searchHistory, searchHistory), [searchHistory])
   useEffect(() => writeStorage(STORAGE_KEYS.staff, staff), [staff])
+  useEffect(() => writeStorage(STORAGE_KEYS.accountSettings, accountSettings), [accountSettings])
   useEffect(() => writeStorage(STORAGE_KEYS.accounts, knownUsers), [knownUsers])
+  useEffect(() => writeStorage(STORAGE_KEYS.websiteTheme, websiteTheme), [websiteTheme])
 
   const allBooks = useMemo(() => [...localBooks, ...books], [books, localBooks])
   const topics = useMemo(() => ['all', ...new Set(allBooks.map(getCategory).slice(0, 12))], [allBooks])
@@ -244,6 +257,52 @@ function App() {
     setAccount(guestAccount)
     navigateTo('home', { instant: true })
     setSelectedBook(null)
+  }
+
+  async function updateAccountProfile({ avatar, displayName }) {
+    const trimmedName = displayName.trim()
+    if (!auth.currentUser || !trimmedName) return
+
+    const nextSettings = {
+      ...(accountSettings[account.id] || {}),
+      avatar,
+      displayName: trimmedName,
+      websiteTheme,
+    }
+
+    await updateProfile(auth.currentUser, { displayName: trimmedName })
+
+    setAccount((current) => ({ ...current, avatar, name: trimmedName }))
+    setAccountSettings((current) => ({ ...current, [account.id]: nextSettings }))
+    setKnownUsers((current) => upsertUser(current, { ...account, avatar, name: trimmedName }))
+    setToast({ type: 'success', message: 'Account profile updated.' })
+  }
+
+  async function resetAccountPassword() {
+    if (!account.email) return
+    await sendPasswordResetEmail(auth, account.email)
+    setToast({ type: 'success', message: `Password reset email sent to ${account.email}.` })
+  }
+
+  async function handleForgotPassword(email) {
+    const normalizedEmail = email.trim().toLowerCase()
+    await sendPasswordResetEmail(auth, normalizedEmail)
+    setToast({ type: 'success', message: `Password reset email sent to ${normalizedEmail}.` })
+  }
+
+  function updateWebsiteTheme(nextTheme) {
+    setWebsiteTheme(nextTheme)
+    if (account.role !== 'guest') {
+      setAccountSettings((current) => ({
+        ...current,
+        [account.id]: {
+          ...(current[account.id] || {}),
+          avatar: account.avatar || '',
+          displayName: account.name,
+          websiteTheme: nextTheme,
+        },
+      }))
+    }
   }
 
   function goGuest() {
@@ -397,6 +456,7 @@ function App() {
           authLoading={authLoading}
           authMode={authMode}
           handleAuth={handleAuth}
+          onForgotPassword={handleForgotPassword}
           onGuest={goGuest}
           setAuthForm={setAuthForm}
           setAuthMode={updateAuthMode}
@@ -501,13 +561,21 @@ function App() {
         account={account}
         books={allBooks}
         favorites={favorites}
+        fontScale={fontScale}
         history={history}
         highlights={highlights}
+        onProfileUpdate={updateAccountProfile}
         onRead={openBook}
+        onResetPassword={resetAccountPassword}
         progress={progress}
         readingDays={readingActivity[getAccountKey(account)] || []}
+        readerTheme={readerTheme}
+        setFontScale={setFontScale}
+        setReaderTheme={setReaderTheme}
+        setWebsiteTheme={updateWebsiteTheme}
         viewCounts={viewCounts}
         viewerCounts={getViewerCounts(bookReaders)}
+        websiteTheme={websiteTheme}
       />
     ),
     admin: account.role === 'admin' ? (
@@ -529,7 +597,7 @@ function App() {
 
   return (
     <NavigationProvider value={navigation}>
-      <AppShell account={account} onAuth={goAuth} onGuest={goGuest} onLogout={handleLogout}>
+      <AppShell account={account} onAuth={goAuth} onGuest={goGuest} onLogout={handleLogout} websiteTheme={websiteTheme}>
         <Suspense fallback={<PageFallback />}>{pages[activePage] || pages.home}</Suspense>
         {toast && <AppToast message={toast.message} onClose={() => setToast(null)} type={toast.type} />}
       </AppShell>

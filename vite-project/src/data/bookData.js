@@ -2,6 +2,8 @@ export const API_URL = 'https://gutendex.com/books'
 
 export const STORAGE_KEYS = {
   account: 'bookworm-current-account',
+  accountSettings: 'bookworm-account-settings',
+  websiteTheme: 'bookworm-website-theme',
   accounts: 'bookworm-accounts',
   library: 'bookworm-local-library',
   favorites: 'bookworm-favorites',
