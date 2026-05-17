@@ -1969,6 +1969,16 @@ progress {
   color: #ffffff;
 }
 
+.reader-night label,
+.reader-night .reader-page-meter {
+  color: #f2f2ed;
+}
+
+.reader-night .mono-eyebrow,
+.reader-night .reader-page-meter small {
+  color: #bdbdb4;
+}
+
 .reader-topbar,
 .reader-controls {
   display: grid;
@@ -1989,7 +1999,7 @@ progress {
 }
 
 .reader-controls {
-  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr) minmax(170px, 0.75fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(180px, 1fr) minmax(152px, 170px) minmax(240px, 1fr) minmax(240px, 0.9fr);
 }
 
 .reader-main {
@@ -2201,6 +2211,30 @@ progress {
   color: #f2f2ed;
 }
 
+.reader-night .reader-chapter-header,
+.reader-night .chapter-page-grid {
+  border-color: #303030;
+  background: #181818;
+}
+
+.reader-night .reader-page-actions span {
+  color: #f2f2ed;
+}
+
+.reader-night .reader-page-actions button,
+.reader-night .chapter-page-grid button {
+  border-color: #303030;
+  background: #202020;
+  color: #f2f2ed;
+}
+
+.reader-night .chapter-page-grid button.active,
+.reader-night .chapter-page-grid button:hover {
+  border-color: #16a09a;
+  background: #16a09a;
+  color: #ffffff;
+}
+
 .reader-page .reader-frame {
   position: relative;
   display: grid;
@@ -2312,9 +2346,10 @@ progress {
 
 .reader-font-controls {
   display: grid;
-  grid-template-columns: 42px minmax(62px, 1fr) 42px;
+  grid-template-columns: 42px 58px 42px;
   gap: 6px;
   align-items: center;
+  width: max-content;
 }
 
 .reader-font-controls button,
@@ -2719,6 +2754,35 @@ progress {
     min-height: auto;
   }
 
+  .reader-page {
+    grid-template-rows: auto auto auto;
+    align-content: start;
+    overflow-y: auto;
+  }
+
+  .reader-main {
+    align-content: start;
+    min-height: auto;
+  }
+
+  .chapter-panel,
+  .reader-main .notes-panel {
+    min-height: auto;
+    max-height: 360px;
+  }
+
+  .reader-page .reader-frame {
+    height: auto;
+    min-height: 560px;
+    overflow: visible;
+  }
+
+  .reader-text-page,
+  .reader-text-state,
+  .reader-source-fallback {
+    min-height: 380px;
+  }
+
   .admin-form {
     grid-template-columns: 1fr;
   }
@@ -2742,6 +2806,57 @@ progress {
 
   .reader-topbar {
     grid-template-columns: 1fr;
+  }
+
+  .reader-page {
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .reader-controls {
+    gap: 10px;
+  }
+
+  .reader-controls label {
+    min-width: 0;
+  }
+
+  .reader-controls label:first-child select {
+    min-height: 48px;
+  }
+
+  .reader-main .chapter-panel {
+    display: none;
+  }
+
+  .reader-font-controls {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .reader-page-meter {
+    min-width: 0;
+  }
+
+  .reader-page-meter span {
+    overflow-wrap: anywhere;
+  }
+
+  .reader-chapter-header {
+    align-items: flex-start;
+  }
+
+  .reader-page-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .reader-page-actions span {
+    min-width: 58px;
+  }
+
+  .reader-text-page {
+    padding: 22px 18px;
   }
 
   .page-shell {

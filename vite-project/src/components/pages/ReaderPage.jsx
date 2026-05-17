@@ -3,6 +3,9 @@ import { getReaderUrl } from '../../utils/bookUtils'
 import { getBookChapters, getChapterIndex, getTotalPages } from '../../utils/chapterUtils'
 
 const GUEST_CHAPTER_LIMIT = 3
+const READER_PAGE_TARGET_LENGTH = 1800
+const MAX_GENERATED_READER_PAGES = 260
+const MAX_DETECTED_CHAPTER_NUMBER = 250
 
 function ReaderPage({
   account,
@@ -32,18 +35,20 @@ function ReaderPage({
   const activeBook = useMemo(() => book || { id: 'empty', title: '', formats: {} }, [book])
   const readerUrl = getReaderUrl(activeBook)
   const readerTextUrl = getReaderTextUrl(activeBook)
-  const totalPages = useMemo(() => getTotalPages(activeBook), [activeBook])
-  const metadataChapters = useMemo(() => getBookChapters(activeBook, totalPages), [activeBook, totalPages])
+  const metadataTotalPages = useMemo(() => getTotalPages(activeBook), [activeBook])
+  const metadataChapters = useMemo(() => getBookChapters(activeBook, metadataTotalPages), [activeBook, metadataTotalPages])
   const contentChapters = useMemo(
-    () => getContentChapters(activeBook, readerText, totalPages),
-    [activeBook, readerText, totalPages],
+    () => getContentChapters(activeBook, readerText, metadataTotalPages),
+    [activeBook, readerText, metadataTotalPages],
   )
   const chapters = contentChapters.length > 1 ? contentChapters : metadataChapters
+  const totalPages = useMemo(() => getChapterPageTotal(chapters) || metadataTotalPages, [chapters, metadataTotalPages])
   const readerPages = useMemo(() => buildReaderPages(readerText, chapters, totalPages), [chapters, readerText, totalPages])
   const checkpointKey = useMemo(() => getCheckpointKey(account, activeBook), [account, activeBook])
   const isGuest = account?.role === 'guest'
   const savedCheckpoint = isGuest ? null : checkpoints[checkpointKey]
-  const [currentPage, setCurrentPage] = useState(() => clampPage(startPage || savedCheckpoint?.page || 1, totalPages))
+  const [requestedPage, setCurrentPage] = useState(() => clampPage(startPage || savedCheckpoint?.page || 1, totalPages))
+  const currentPage = clampPage(requestedPage, totalPages)
   const currentChapterIndex = getChapterIndex(currentPage, chapters)
   const currentChapter = chapters[currentChapterIndex]
   const currentChapterNumber = currentChapterIndex + 1
@@ -431,16 +436,18 @@ function getReaderTextUrl(book) {
   const formats = book.formats || {}
 
   return (
-    formats['text/plain; charset=utf-8'] ||
-    formats['text/plain'] ||
+    getFormatUrl(formats, 'text/plain') ||
     getProjectGutenbergTextUrl(book) ||
-    formats['text/html; charset=utf-8'] ||
-    formats['text/html'] ||
+    getFormatUrl(formats, 'text/html') ||
     book.readerTextUrl ||
     book.reader_text_url ||
     book.readerUrl ||
     ''
   )
+}
+
+function getFormatUrl(formats, mimePrefix) {
+  return Object.entries(formats).find(([mimeType, url]) => mimeType.startsWith(mimePrefix) && url)?.[1] || ''
 }
 
 function getProjectGutenbergTextUrl(book) {
@@ -472,7 +479,16 @@ function getFetchableReaderUrl(url) {
     const parsedUrl = new URL(url)
 
     if (parsedUrl.hostname.endsWith('gutenberg.org')) {
-      return `/gutenberg${parsedUrl.pathname}${parsedUrl.search}`
+      const cacheTextMatch = parsedUrl.pathname.match(/^\/cache\/epub\/(\d+)\/pg\d+\.txt$/i)
+      if (cacheTextMatch) return `/api/reader-text/${cacheTextMatch[1]}/plain`
+
+      const ebookTextMatch = parsedUrl.pathname.match(/^\/ebooks\/(\d+)\.txt/i)
+      if (ebookTextMatch) return `/api/reader-text/${ebookTextMatch[1]}/plain`
+
+      const fileMatch = parsedUrl.pathname.match(/^\/files\/(\d+)\/([^/]+)$/i)
+      if (fileMatch) return `/api/reader-text/${fileMatch[1]}/file/${fileMatch[2]}`
+
+      return `/api/reader-text${parsedUrl.pathname}${parsedUrl.search}`
     }
   } catch {
     return url
@@ -551,19 +567,21 @@ function getContentChapters(book, text, totalPages) {
   const detectedChapters = splitTextByChapterHeadings(text)
   if (detectedChapters.length < 2) return []
 
+  const contentTotalPages = estimateContentPageCount(text, totalPages, detectedChapters.length)
   const chapterSections =
-    detectedChapters.length > totalPages ? groupChapterSections(detectedChapters, totalPages) : detectedChapters
-  const pageCounts = distributePagesByContent(chapterSections, totalPages)
+    detectedChapters.length > contentTotalPages ? groupChapterSections(detectedChapters, contentTotalPages) : detectedChapters
+  const pageCounts = distributePagesByContent(chapterSections, contentTotalPages)
   let startPage = 1
 
   return chapterSections.map((chapter, index) => {
     const pages = pageCounts[index]
     const number = chapter.number || index + 1
+    const label = chapter.label || `Chapter ${number}`
     const normalizedChapter = {
       id: `${book.id || 'book'}-content-chapter-${index + 1}`,
-      label: `Chapter ${number}`,
+      label,
       number,
-      title: chapter.title || `Chapter ${number}`,
+      title: chapter.title || label,
       startPage,
       pages,
       content: chapter.content,
@@ -581,10 +599,11 @@ function splitTextByChapterHeadings(text) {
 
   const chapters = candidates.map((candidate, index) => {
     const end = candidates[index + 1]?.index ?? text.length
-    const prefix = index === 0 ? text.slice(0, candidate.index).trim() : ''
+    const prefix = ''
     const body = text.slice(candidate.index, end).trim()
 
     return {
+      label: candidate.label,
       number: candidate.number,
       title: candidate.title,
       content: [prefix, body].filter(Boolean).join('\n\n'),
@@ -614,12 +633,24 @@ function getChapterHeadingCandidates(text) {
     const number = parseChapterNumber(marker)
     candidates.push({
       index: line.index,
+      kind: 'standalone',
+      label: `Chapter ${formatChapterMarker(marker)}`,
       number,
       title: cleanHeadingTitle(nextLine.text.trim()) || `Chapter ${number || marker}`,
     })
   })
 
-  return candidates
+  const chapterCandidates = candidates.filter((candidate) => candidate.headingType === 'chapter')
+  if (chapterCandidates.length >= 2) return chapterCandidates
+
+  const actCandidates = candidates.filter((candidate) => candidate.headingType === 'act')
+  if (actCandidates.length >= 2) return actCandidates
+
+  const namedCandidates = candidates.filter((candidate) => candidate.kind === 'named')
+  if (namedCandidates.length >= 2) return namedCandidates
+
+  const numberedCandidates = candidates.filter((candidate) => candidate.kind === 'numbered')
+  return numberedCandidates.length >= 2 ? numberedCandidates : candidates
 }
 
 function getIndexedLines(text) {
@@ -636,19 +667,26 @@ function parseInlineChapterHeading(line) {
   const heading = line.trim()
   if (!isReasonableHeadingLength(heading)) return null
 
-  const namedHeading = heading.match(/^(chapter|letter|book|volume)\s+([ivxlcdm]+|\d+)\b[).: -]*(.*)$/i)
+  const namedHeading = heading.match(/^(chapter|letter|book|volume|act)\s+([ivxlcdm]+|\d+)\b[).: -]*(.*)$/i)
   if (namedHeading) {
     const number = parseChapterNumber(namedHeading[2])
-    const title = cleanHeadingTitle(namedHeading[3]) || `${capitalizeWord(namedHeading[1])} ${namedHeading[2].toUpperCase()}`
+    if (!number) return null
 
-    return { number, title }
+    const label = `${capitalizeWord(namedHeading[1])} ${formatChapterMarker(namedHeading[2])}`
+    const title = cleanHeadingTitle(namedHeading[3]) || label
+
+    return { headingType: namedHeading[1].toLowerCase(), kind: 'named', label, number, title }
   }
 
   const numberedHeading = heading.match(/^([ivxlcdm]+|\d+)[.)]\s+(.+)$/i) || heading.match(/^([ivxlcdm]+|\d+)\s[-:]\s(.+)$/i)
   if (!numberedHeading || !isLikelyInlineChapterTitle(numberedHeading[2])) return null
+  const number = parseChapterNumber(numberedHeading[1])
+  if (!number) return null
 
   return {
-    number: parseChapterNumber(numberedHeading[1]),
+    kind: 'numbered',
+    label: `Chapter ${formatChapterMarker(numberedHeading[1])}`,
+    number,
     title: cleanHeadingTitle(numberedHeading[2]),
   }
 }
@@ -659,8 +697,8 @@ function parseStandaloneChapterMarker(line) {
 }
 
 function parseChapterNumber(value) {
-  if (/^\d+$/.test(value)) return Number(value)
-  return romanToNumber(value)
+  const number = /^\d+$/.test(value) ? Number(value) : romanToNumber(value)
+  return number && number <= MAX_DETECTED_CHAPTER_NUMBER ? number : null
 }
 
 function romanToNumber(value) {
@@ -714,20 +752,54 @@ function trimLeadingTableOfContents(candidates) {
     .filter(({ candidate, index }) => index > 0 && candidate.number === 1 && (candidates[index - 1].number || 0) > 1)
     .map(({ index }) => index)
 
-  const restartIndex = restartIndexes.reverse().find((index) => candidates.length - index >= 2)
+  const restartIndex = restartIndexes.find(
+    (index) => candidates.length - index >= 2 && isLikelyTableOfContentsBeforeRestart(candidates, index),
+  )
   return restartIndex ? candidates.slice(restartIndex) : candidates
 }
 
+function isLikelyTableOfContentsBeforeRestart(candidates, restartIndex) {
+  const leadingCandidates = candidates.slice(0, restartIndex)
+  if (leadingCandidates.length < 3) return false
+
+  const gaps = leadingCandidates
+    .slice(0, -1)
+    .map((candidate, index) => leadingCandidates[index + 1].index - candidate.index)
+  const denseGaps = gaps.filter((gap) => gap <= 320).length
+  const denseRatio = gaps.length ? denseGaps / gaps.length : 0
+  const leadingSpan = leadingCandidates[leadingCandidates.length - 1].index - leadingCandidates[0].index
+
+  return denseRatio >= 0.65 && leadingSpan <= leadingCandidates.length * 420
+}
+
 function cleanHeadingTitle(title = '') {
-  return title
+  const cleanedTitle = title
     .replace(/\s+/g, ' ')
-    .replace(/^[).: -]+/, '')
-    .replace(/[).: -]+$/, '')
+    .replace(/^[\s\])}.'"“”‘’_:;-]+/, '')
+    .replace(/[\s[({.'"“”‘’_:;-]+$/, '')
     .trim()
+
+  return /[a-z0-9]/i.test(cleanedTitle) ? cleanedTitle : ''
 }
 
 function capitalizeWord(word) {
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+}
+
+function formatChapterMarker(marker) {
+  return /^\d+$/.test(marker) ? String(Number(marker)) : marker.toUpperCase()
+}
+
+function estimateContentPageCount(text, fallbackPages, chapterCount) {
+  const estimatedPages = Math.ceil(text.length / READER_PAGE_TARGET_LENGTH)
+  const minimumPages = Math.max(1, chapterCount)
+  const preferredPages = Math.max(minimumPages, estimatedPages)
+
+  return Math.min(MAX_GENERATED_READER_PAGES, Math.max(minimumPages, preferredPages || fallbackPages))
+}
+
+function getChapterPageTotal(chapters) {
+  return chapters.reduce((total, chapter) => total + Math.max(0, chapter.pages || 0), 0)
 }
 
 function groupChapterSections(sections, targetCount) {
