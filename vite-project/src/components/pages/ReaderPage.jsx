@@ -10,6 +10,7 @@ const MAX_DETECTED_CHAPTER_NUMBER = 250
 function ReaderPage({
   account,
   book,
+  canPersistReaderState = false,
   checkpoints,
   favorites,
   fontScale,
@@ -61,7 +62,7 @@ function ReaderPage({
 
   const saveCheckpoint = useCallback(
     (page = currentPage) => {
-      if (!book || isGuest) return
+      if (!book || !canPersistReaderState || isGuest) return
 
       const safePage = clampPage(page, totalPages)
       const chapterIndex = getChapterIndex(safePage, chapters)
@@ -79,8 +80,21 @@ function ReaderPage({
       }))
       setProgress((current) => ({ ...current, [activeBook.id]: Math.min(100, Math.round((safePage / totalPages) * 100)) }))
     },
-    [activeBook.id, book, chapters, checkpointKey, currentPage, isGuest, setCheckpoints, setProgress, totalPages],
+    [activeBook.id, book, canPersistReaderState, chapters, checkpointKey, currentPage, isGuest, setCheckpoints, setProgress, totalPages],
   )
+
+  useEffect(() => {
+    let isCurrent = true
+    const nextPage = clampPage(startPage || savedCheckpoint?.page || 1, totalPages)
+    queueMicrotask(() => {
+      if (!isCurrent) return
+      setCurrentPage((current) => (current === nextPage ? current : nextPage))
+    })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [activeBook.id, savedCheckpoint?.page, startPage, totalPages])
 
   useEffect(() => {
     if (!book) return
@@ -600,7 +614,7 @@ function splitTextByChapterHeadings(text) {
   const chapters = candidates.map((candidate, index) => {
     const end = candidates[index + 1]?.index ?? text.length
     const prefix = ''
-    const body = text.slice(candidate.index, end).trim()
+    const body = stripLeadingChapterHeading(text.slice(candidate.index, end).trim())
 
     return {
       label: candidate.label,
@@ -611,6 +625,18 @@ function splitTextByChapterHeadings(text) {
   })
 
   return chapters.filter((chapter) => chapter.content.length > 80)
+}
+
+function stripLeadingChapterHeading(content) {
+  const lines = content.split('\n')
+  const firstLine = lines[0]?.trim() || ''
+  if (!firstLine) return content
+
+  if (parseInlineChapterHeading(firstLine) || parseStandaloneChapterMarker(firstLine)) {
+    return lines.slice(1).join('\n').trim()
+  }
+
+  return content
 }
 
 function getChapterHeadingCandidates(text) {

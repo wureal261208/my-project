@@ -2550,6 +2550,8 @@ progress {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  max-height: 106px;
+  overflow: auto;
   padding: 10px 14px;
   border-bottom: 1px solid #d8d8d3;
   background: #fbfbf8;
@@ -3254,7 +3256,10 @@ progress {
     min-height: auto;
   }
 
-  .chapter-panel,
+  .reader-main .chapter-panel {
+    display: none;
+  }
+
   .reader-main .notes-panel {
     min-height: auto;
     max-height: 360px;
@@ -3312,10 +3317,6 @@ progress {
 
   .reader-controls label:first-child select {
     min-height: 48px;
-  }
-
-  .reader-main .chapter-panel {
-    display: none;
   }
 
   .reader-font-controls {
