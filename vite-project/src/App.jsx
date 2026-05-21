@@ -73,20 +73,20 @@ function App() {
   const routeTimerRef = useRef(null)
   const [books, setBooks] = useState(fallbackBooks)
   const [, setBooksLoading] = useState(false)
-  const [localBooks, setLocalBooks] = useState(() => readStorage(STORAGE_KEYS.library, []))
-  const [favorites, setFavorites] = useState(() => readStorage(STORAGE_KEYS.favorites, []))
-  const [history, setHistory] = useState(() => readStorage(STORAGE_KEYS.history, []))
-  const [readingActivity, setReadingActivity] = useState(() => readStorage(STORAGE_KEYS.readingActivity, {}))
-  const [viewCounts, setViewCounts] = useState(() => readStorage(STORAGE_KEYS.views, {}))
-  const [bookReaders, setBookReaders] = useState(() => readStorage(STORAGE_KEYS.readers, {}))
-  const [progress, setProgress] = useState(() => readStorage(STORAGE_KEYS.progress, {}))
-  const [checkpoints, setCheckpoints] = useState(() => readStorage(STORAGE_KEYS.checkpoints, {}))
-  const [notes, setNotes] = useState(() => readStorage(STORAGE_KEYS.notes, {}))
-  const [highlights, setHighlights] = useState(() => readStorage(STORAGE_KEYS.highlights, {}))
-  const [comments, setComments] = useState(() => readStorage(STORAGE_KEYS.comments, {}))
-  const [searchHistory, setSearchHistory] = useState(() => readStorage(STORAGE_KEYS.searchHistory, []))
-  const [staff, setStaff] = useState(() => readStorage(STORAGE_KEYS.staff, []))
-  const [accountSettings, setAccountSettings] = useState(() => readStorage(STORAGE_KEYS.accountSettings, {}))
+  const [localBooks, setLocalBooks] = useState(globalDataDefaults.localBooks)
+  const [favorites, setFavorites] = useState(userDataDefaults.favorites)
+  const [history, setHistory] = useState(userDataDefaults.history)
+  const [readingActivity, setReadingActivity] = useState(userDataDefaults.readingActivity)
+  const [viewCounts, setViewCounts] = useState(globalDataDefaults.viewCounts)
+  const [bookReaders, setBookReaders] = useState(globalDataDefaults.bookReaders)
+  const [progress, setProgress] = useState(userDataDefaults.progress)
+  const [checkpoints, setCheckpoints] = useState(userDataDefaults.checkpoints)
+  const [notes, setNotes] = useState(userDataDefaults.notes)
+  const [highlights, setHighlights] = useState(userDataDefaults.highlights)
+  const [comments, setComments] = useState(globalDataDefaults.comments)
+  const [searchHistory, setSearchHistory] = useState(userDataDefaults.searchHistory)
+  const [staff, setStaff] = useState(globalDataDefaults.staff)
+  const [accountSettings, setAccountSettings] = useState(userDataDefaults.accountSettings)
   const [selectedBook, setSelectedBook] = useState(null)
   const [readerStartPage, setReaderStartPage] = useState(null)
   const [query, setQuery] = useState('')
@@ -361,22 +361,25 @@ function App() {
     }
   }, [])
 
-  useEffect(() => writeStorage(STORAGE_KEYS.library, localBooks), [localBooks])
-  useEffect(() => writeStorage(STORAGE_KEYS.favorites, favorites), [favorites])
-  useEffect(() => writeStorage(STORAGE_KEYS.history, history), [history])
-  useEffect(() => writeStorage(STORAGE_KEYS.readingActivity, readingActivity), [readingActivity])
-  useEffect(() => writeStorage(STORAGE_KEYS.views, viewCounts), [viewCounts])
-  useEffect(() => writeStorage(STORAGE_KEYS.readers, bookReaders), [bookReaders])
-  useEffect(() => writeStorage(STORAGE_KEYS.progress, progress), [progress])
-  useEffect(() => writeStorage(STORAGE_KEYS.checkpoints, checkpoints), [checkpoints])
-  useEffect(() => writeStorage(STORAGE_KEYS.notes, notes), [notes])
-  useEffect(() => writeStorage(STORAGE_KEYS.highlights, highlights), [highlights])
-  useEffect(() => writeStorage(STORAGE_KEYS.comments, comments), [comments])
-  useEffect(() => writeStorage(STORAGE_KEYS.searchHistory, searchHistory), [searchHistory])
-  useEffect(() => writeStorage(STORAGE_KEYS.staff, staff), [staff])
-  useEffect(() => writeStorage(STORAGE_KEYS.accountSettings, accountSettings), [accountSettings])
-  useEffect(() => writeStorage(STORAGE_KEYS.accounts, knownUsers), [knownUsers])
-  useEffect(() => writeStorage(STORAGE_KEYS.websiteTheme, websiteTheme), [websiteTheme])
+  useEffect(() => {
+    if (!globalDataReady) return
+
+    const nextSnapshot = stableStringify(globalData)
+    if (nextSnapshot === globalDataSnapshotRef.current) return
+
+    globalDataSnapshotRef.current = nextSnapshot
+    saveGlobalData(globalData).catch(handleDataSyncError)
+  }, [globalData, globalDataReady, handleDataSyncError])
+
+  useEffect(() => {
+    if (account.role === 'guest' || !userDataReady) return
+
+    const nextSnapshot = stableStringify(userData)
+    if (nextSnapshot === userDataSnapshotRef.current) return
+
+    userDataSnapshotRef.current = nextSnapshot
+    saveUserData(account.id, userData).catch(handleDataSyncError)
+  }, [account.id, account.role, handleDataSyncError, userData, userDataReady])
 
   const allBooks = useMemo(() => [...localBooks, ...books], [books, localBooks])
   const topics = useMemo(() => ['all', ...new Set(allBooks.map(getCategory).slice(0, 12))], [allBooks])
