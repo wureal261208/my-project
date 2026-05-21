@@ -74,8 +74,7 @@ function App() {
   const [bookReaders, setBookReaders] = useState(() => readStorage(STORAGE_KEYS.readers, {}))
   const [progress, setProgress] = useState(() => readStorage(STORAGE_KEYS.progress, {}))
   const [checkpoints, setCheckpoints] = useState(() => readStorage(STORAGE_KEYS.checkpoints, {}))
-  const [notes, setNotes] = useState(() => readStorage(STORAGE_KEYS.notes, {}))
-  const [highlights, setHighlights] = useState(() => readStorage(STORAGE_KEYS.highlights, {}))
+  const [highlights] = useState(() => readStorage(STORAGE_KEYS.highlights, {}))
   const [comments, setComments] = useState(() => readStorage(STORAGE_KEYS.comments, {}))
   const [searchHistory, setSearchHistory] = useState(() => readStorage(STORAGE_KEYS.searchHistory, []))
   const [staff, setStaff] = useState(() => readStorage(STORAGE_KEYS.staff, []))
@@ -183,7 +182,6 @@ function App() {
   useEffect(() => writeStorage(STORAGE_KEYS.readers, bookReaders), [bookReaders])
   useEffect(() => writeStorage(STORAGE_KEYS.progress, progress), [progress])
   useEffect(() => writeStorage(STORAGE_KEYS.checkpoints, checkpoints), [checkpoints])
-  useEffect(() => writeStorage(STORAGE_KEYS.notes, notes), [notes])
   useEffect(() => writeStorage(STORAGE_KEYS.highlights, highlights), [highlights])
   useEffect(() => writeStorage(STORAGE_KEYS.comments, comments), [comments])
   useEffect(() => writeStorage(STORAGE_KEYS.searchHistory, searchHistory), [searchHistory])
@@ -368,8 +366,7 @@ function App() {
 
   function openChapter(book, chapter) {
     if (account.role === 'guest' && chapter.number > 3) {
-      setToast({ type: 'error', message: 'Guest readers can preview the first 3 chapters. Login to continue.' })
-      goAuth()
+      setToast({ type: 'error', message: 'BookWorm membership is required to read beyond chapter 3.' })
       return
     }
 
@@ -383,24 +380,6 @@ function App() {
       const days = current[accountKey] || []
       return days.includes(today) ? current : { ...current, [accountKey]: [today, ...days].slice(0, 90) }
     })
-  }
-
-  function addHighlight(bookId, text, location) {
-    const trimmedText = text.trim()
-    if (!trimmedText) return
-
-    const nextHighlight = {
-      id: `highlight-${Date.now()}`,
-      bookId,
-      location,
-      text: trimmedText,
-      createdAt: new Date().toISOString(),
-    }
-
-    setHighlights((current) => ({
-      ...current,
-      [bookId]: [nextHighlight, ...(current[bookId] || [])].slice(0, 20),
-    }))
   }
 
   function addComment(bookId, text) {
@@ -539,6 +518,8 @@ function App() {
         onComment={addComment}
         onDetail={openDetail}
         onFavorite={toggleFavorite}
+        onHome={() => navigateTo('home')}
+        onAuth={goAuth}
         onRead={openBook}
         viewCount={selectedBook ? viewCounts[selectedBook.id] || 0 : 0}
         viewCounts={viewCounts}
@@ -552,19 +533,19 @@ function App() {
         book={selectedBook}
         account={account}
         checkpoints={checkpoints}
+        comments={comments[selectedBook?.id] || []}
         favorites={favorites}
-        highlights={highlights[selectedBook?.id] || []}
         fontScale={fontScale}
-        notes={notes}
-        onHighlight={addHighlight}
         onBack={() => navigateTo('detail')}
+        onComment={addComment}
+        onDiscover={() => navigateTo('discover')}
         onFavorite={toggleFavorite}
+        onHome={() => navigateTo('home')}
         onLoginRequired={goAuth}
         readerTheme={readerTheme}
         startPage={readerStartPage}
         setCheckpoints={setCheckpoints}
         setFontScale={setFontScale}
-        setNotes={setNotes}
         setProgress={setProgress}
         setReaderTheme={setReaderTheme}
       />

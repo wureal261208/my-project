@@ -527,6 +527,10 @@ textarea {
   width: min(100%, 470px);
 }
 
+.forgot-form .form-heading {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .forgot-copy {
   margin: -2px 0 4px;
   color: #60646c;
@@ -1397,6 +1401,10 @@ progress {
   animation: pageRise 0.34s ease both;
 }
 
+.detail-page {
+  position: relative;
+}
+
 .page-fallback {
   display: grid;
   min-height: 48svh;
@@ -1987,12 +1995,110 @@ progress {
   color: #16a09a;
 }
 
-.back-button {
-  margin-bottom: 14px;
+.detail-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 24px;
+  padding: 6px;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+
+.detail-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--app-muted);
+  font-weight: 950;
+}
+
+.detail-tabs button.active,
+.detail-tabs button:hover {
+  background: var(--app-text);
+  color: var(--app-surface);
 }
 
 .recommendations-section {
   margin-top: 28px;
+}
+
+.save-book-prompt {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto 34px;
+  gap: 12px;
+  align-items: center;
+  max-height: 0;
+  margin-top: 0;
+  overflow: hidden;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface));
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    max-height 0.28s ease,
+    margin-top 0.28s ease,
+    padding 0.28s ease,
+    border-color 0.28s ease,
+    opacity 0.24s ease,
+    transform 0.24s ease;
+}
+
+.save-book-prompt.show {
+  max-height: 130px;
+  margin-top: 2px;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-line));
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.save-book-prompt > i {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--app-text);
+  color: var(--app-surface);
+  font-size: 18px;
+}
+
+.save-book-prompt strong,
+.save-book-prompt p {
+  margin: 0;
+}
+
+.save-book-prompt p {
+  margin-top: 3px;
+  color: var(--app-muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.save-book-prompt > button:last-child {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--app-muted);
+}
+
+.save-book-prompt > button:last-child:hover {
+  background: var(--app-surface);
+  color: var(--app-text);
 }
 
 .comments-section {
@@ -2002,6 +2108,35 @@ progress {
 .comments-section .section-heading > span {
   color: #555550;
   font-weight: 900;
+}
+
+.comment-sort {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  width: fit-content;
+  margin-bottom: 12px;
+  padding: 4px;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.comment-sort button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #555550;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.comment-sort button.active,
+.comment-sort button:hover {
+  background: #111111;
+  color: #ffffff;
 }
 
 .comment-form {
@@ -2025,6 +2160,11 @@ progress {
 .comment-list {
   display: grid;
   gap: 12px;
+}
+
+.comment-more-button {
+  width: fit-content;
+  justify-self: center;
 }
 
 .comment-item {
@@ -2094,16 +2234,14 @@ progress {
 
 .reader-focus .reader-topbar,
 .reader-focus .reader-controls,
-.reader-focus .chapter-panel,
-.reader-focus .reader-main .notes-panel,
+.reader-focus .reader-comments-panel,
 .reader-focus .reader-frame {
   box-shadow: none;
 }
 
 .reader-night .reader-topbar,
 .reader-night .reader-controls,
-.reader-night .chapter-panel,
-.reader-night .reader-main .notes-panel,
+.reader-night .reader-comments-panel,
 .reader-night .reader-frame {
   border-color: #303030;
   background: #181818;
@@ -2143,29 +2281,120 @@ progress {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
+.reader-navbar {
+  grid-template-columns: auto minmax(300px, 0.8fr) minmax(0, 1fr) auto;
+}
+
+.reader-brand-button {
+  width: fit-content;
+}
+
+.reader-title-block {
+  min-width: 0;
+}
+
+.reader-nav {
+  justify-content: flex-start;
+  min-width: 0;
+  overflow-x: auto;
+}
+
 .reader-topbar h1 {
   font-size: clamp(20px, 3vw, 34px);
 }
 
 .reader-controls {
-  grid-template-columns: minmax(180px, 1fr) minmax(152px, 170px) minmax(240px, 1fr) minmax(240px, 0.9fr);
+  grid-template-columns: minmax(150px, 0.8fr) minmax(152px, 170px) minmax(240px, 1fr);
 }
 
 .reader-main {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 250px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
   gap: 12px;
   min-height: 0;
 }
 
-.chapter-panel,
-.reader-main .notes-panel {
+.reader-comments-panel {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 12px;
   min-height: 0;
   overflow: auto;
   border: 1px solid #d8d8d3;
   border-radius: 8px;
   background: #ffffff;
   padding: 14px;
+}
+
+.reader-comment-form {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #d8d8d3;
+}
+
+.reader-comment-form textarea {
+  min-height: 104px;
+}
+
+.reader-comment-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.reader-comment-item,
+.reader-empty-comments {
+  padding: 12px;
+  border: 1px solid #e2e2dd;
+  border-radius: 8px;
+  background: #fbfbf8;
+}
+
+.reader-comment-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.reader-comment-item > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.reader-comment-item strong {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #111111;
+  line-height: 1.25;
+}
+
+.reader-comment-item span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eefaf8;
+  color: #146b66;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.reader-comment-item p {
+  margin: 0;
+  color: #3f3f3a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.reader-comment-item time,
+.reader-empty-comments {
+  color: #777771;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .chapter-panel {
@@ -2353,6 +2582,30 @@ progress {
   color: #f2f2ed;
 }
 
+.reader-night .reader-comment-form {
+  border-color: #303030;
+}
+
+.reader-night .reader-comment-item,
+.reader-night .reader-empty-comments {
+  border-color: #303030;
+  background: #202020;
+  color: #f2f2ed;
+}
+
+.reader-night .reader-comment-item p {
+  color: #d8d8d3;
+}
+
+.reader-night .reader-comment-item strong {
+  color: #f2f2ed;
+}
+
+.reader-night .reader-comment-item span {
+  background: #263b38;
+  color: #9ff0ea;
+}
+
 .reader-night .reader-font-controls button,
 .reader-night .reader-font-controls span {
   border-color: #303030;
@@ -2361,7 +2614,8 @@ progress {
 }
 
 .reader-night .reader-chapter-header,
-.reader-night .chapter-page-grid {
+.reader-night .chapter-page-grid,
+.reader-night .reader-chapter-strip {
   border-color: #303030;
   background: #181818;
 }
@@ -2371,14 +2625,34 @@ progress {
 }
 
 .reader-night .reader-page-actions button,
-.reader-night .chapter-page-grid button {
+.reader-night .chapter-page-grid button,
+.reader-night .reader-chapter-strip button {
   border-color: #303030;
   background: #202020;
   color: #f2f2ed;
 }
 
+.reader-night .comment-sort,
+.reader-night .reader-page-meter button {
+  border-color: #303030;
+  background: #202020;
+  color: #f2f2ed;
+}
+
+.reader-night .comment-sort button {
+  color: #bdbdb4;
+}
+
+.reader-night .comment-sort button.active,
+.reader-night .comment-sort button:hover {
+  background: #f2f2ed;
+  color: #111111;
+}
+
 .reader-night .chapter-page-grid button.active,
-.reader-night .chapter-page-grid button:hover {
+.reader-night .chapter-page-grid button:hover,
+.reader-night .reader-chapter-strip button.active,
+.reader-night .reader-chapter-strip button:hover {
   border-color: #16a09a;
   background: #16a09a;
   color: #ffffff;
@@ -2519,7 +2793,8 @@ progress {
 }
 
 .reader-page-actions button,
-.chapter-page-grid button {
+.chapter-page-grid button,
+.reader-chapter-strip button {
   display: grid;
   place-items: center;
   border: 1px solid #d8d8d3;
@@ -2565,6 +2840,176 @@ progress {
   border-color: #16a09a;
   background: #16a09a;
   color: #ffffff;
+}
+
+.reader-chapter-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+  overflow: hidden;
+  padding: 10px 14px;
+  border-bottom: 1px solid #d8d8d3;
+  background: #fbfbf8;
+}
+
+.reader-chapter-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.reader-chapter-strip button {
+  grid-template-columns: 30px minmax(0, 1fr) 24px;
+  grid-template-rows: auto auto;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  padding: 7px 9px;
+  align-items: center;
+  justify-items: start;
+  text-align: left;
+}
+
+.reader-chapter-strip button.active,
+.reader-chapter-strip button:hover {
+  border-color: #16a09a;
+  background: #16a09a;
+  color: #ffffff;
+}
+
+.reader-chapter-strip button span {
+  display: grid;
+  grid-row: 2;
+  width: 30px;
+  height: 28px;
+  place-items: center;
+  border-radius: 6px;
+  background: #ecece8;
+  color: #111111;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.reader-chapter-strip button small {
+  grid-column: 1 / -1;
+  color: #777771;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.reader-chapter-strip button.active small,
+.reader-chapter-strip button:hover small {
+  color: #ffffff;
+}
+
+.reader-chapter-strip button.active span,
+.reader-chapter-strip button:hover span {
+  background: #ffffff;
+  color: #111111;
+}
+
+.reader-chapter-strip button strong {
+  grid-row: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-chapter-strip button i {
+  display: grid;
+  grid-row: 2;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  justify-self: end;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.reader-chapter-strip button.active i,
+.reader-chapter-strip button:hover i {
+  color: #ffffff;
+}
+
+.chapter-strip-gap {
+  display: grid;
+  min-width: 34px;
+  place-items: center;
+  color: #777771;
+  font-weight: 950;
+}
+
+.reader-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 17, 17, 0.42);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.18s ease both;
+}
+
+.member-modal-backdrop {
+  position: absolute;
+  min-height: 100%;
+}
+
+.reader-modal {
+  display: grid;
+  gap: 12px;
+  width: min(470px, 100%);
+  padding: 22px;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+  animation: pageRise 0.22s ease both;
+}
+
+.reader-modal > i {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 8px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.reader-modal h2,
+.reader-modal p {
+  margin: 0;
+}
+
+.reader-modal h2 {
+  font-size: 25px;
+  line-height: 1.12;
+}
+
+.reader-modal p {
+  color: #555550;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.reader-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.reader-member-modal {
+  border-color: color-mix(in srgb, #16a09a 36%, #d8d8d3);
 }
 
 .finished-status {
@@ -2635,14 +3080,38 @@ progress {
   font-size: 12px;
 }
 
+.reader-page-meter button {
+  width: fit-content;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #d8d8d3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111111;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.reader-page-meter button:hover {
+  border-color: #16a09a;
+  color: #14736e;
+}
+
+.reader-page-meter button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .reader-lock {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 58;
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(247, 247, 245, 0.92);
+  background: rgba(17, 17, 17, 0.42);
   backdrop-filter: blur(8px);
+  animation: fadeIn 0.18s ease both;
 }
 
 .reader-lock > div {
@@ -2655,7 +3124,8 @@ progress {
   background: #ffffff;
   color: #111111;
   text-align: center;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+  animation: pageRise 0.22s ease both;
 }
 
 .reader-lock i {
@@ -3251,19 +3721,18 @@ progress {
 
   .reader-main {
     align-content: start;
-    min-height: auto;
+    min-height: 0;
   }
 
-  .chapter-panel,
-  .reader-main .notes-panel {
-    min-height: auto;
-    max-height: 360px;
+  .reader-comments-panel {
+    min-height: 360px;
+    max-height: 460px;
   }
 
   .reader-page .reader-frame {
-    height: auto;
-    min-height: 560px;
-    overflow: visible;
+    height: min(62svh, 620px);
+    min-height: 460px;
+    overflow: hidden;
   }
 
   .reader-text-page,
@@ -3274,6 +3743,33 @@ progress {
 
   .admin-form {
     grid-template-columns: 1fr;
+  }
+
+  .bookworm-auth {
+    min-height: 100svh;
+    overflow-y: auto;
+  }
+
+  .auth-column,
+  .content-panel {
+    padding: clamp(18px, 4vw, 34px);
+  }
+
+  .bookworm-form {
+    width: min(100%, 440px);
+  }
+
+  .reader-navbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .reader-nav {
+    order: 4;
+    grid-column: 1 / -1;
+  }
+
+  .reader-title-block {
+    min-width: 0;
   }
 }
 
@@ -3297,6 +3793,29 @@ progress {
     grid-template-columns: 1fr;
   }
 
+  .reader-navbar {
+    grid-template-columns: 1fr;
+  }
+
+  .reader-brand-button,
+  .reader-nav,
+  .reader-topbar > .ghost-button {
+    width: 100%;
+  }
+
+  .reader-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+    overflow: visible;
+  }
+
+  .reader-nav button {
+    min-width: 0;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
   .reader-page {
     gap: 10px;
     padding: 8px;
@@ -3312,10 +3831,6 @@ progress {
 
   .reader-controls label:first-child select {
     min-height: 48px;
-  }
-
-  .reader-main .chapter-panel {
-    display: none;
   }
 
   .reader-font-controls {
@@ -3348,9 +3863,59 @@ progress {
     padding: 22px 18px;
   }
 
+  .reader-chapter-strip {
+    grid-template-columns: 1fr;
+    grid-auto-columns: unset;
+    padding: 8px;
+  }
+
+  .reader-chapter-strip button {
+    grid-template-columns: 28px minmax(0, 1fr) 22px;
+    grid-template-rows: auto auto;
+    min-height: 40px;
+    padding: 7px;
+  }
+
+  .detail-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .comment-sort {
+    width: 100%;
+  }
+
+  .reader-comment-item > div {
+    display: grid;
+    gap: 6px;
+    align-items: start;
+  }
+
+  .reader-comment-item span {
+    width: fit-content;
+  }
+
+  .reader-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .reader-modal-actions .primary-button,
+  .reader-modal-actions .ghost-button {
+    width: 100%;
+  }
+
   .page-shell {
     width: min(100% - 22px, 480px);
     padding-top: 18px;
+  }
+
+  .save-book-prompt {
+    grid-template-columns: 36px minmax(0, 1fr) 34px;
+  }
+
+  .save-book-prompt .primary-button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .page-title h1,
@@ -3381,6 +3946,63 @@ progress {
 
   .shelf-item .primary-button {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  .bookworm-auth {
+    min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .bookworm-auth::before,
+  .bookworm-auth.auth-login::before,
+  .bookworm-auth.auth-signup::before,
+  .bookworm-auth.auth-forgot::before {
+    right: auto;
+    left: 0;
+    width: 100%;
+    border-radius: 0;
+    transform: none;
+  }
+
+  .auth-content {
+    display: none;
+  }
+
+  .auth-forms,
+  .bookworm-auth.auth-forgot .auth-forms {
+    display: block;
+    min-height: 100svh;
+  }
+
+  .auth-column,
+  .forgot-column {
+    display: none;
+    width: 100%;
+    min-height: 100svh;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    transform: none;
+  }
+
+  .bookworm-auth.auth-login .login-column,
+  .bookworm-auth.auth-signup .signup-column,
+  .bookworm-auth.auth-forgot .forgot-column {
+    display: flex;
+    transform: none;
+  }
+
+  .bookworm-form,
+  .forgot-form {
+    width: min(100%, 440px);
+    max-height: none;
+    overflow: visible;
+    padding: 18px;
+    transform: none;
+    opacity: 1;
   }
 }
 

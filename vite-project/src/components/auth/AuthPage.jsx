@@ -145,9 +145,6 @@ function AuthPage({
           <div className="auth-column forgot-column">
             <form className="bookworm-form forgot-form" noValidate onSubmit={submitForgotPassword}>
               <div className="form-heading">
-                <span>
-                  <Icon name="key" />
-                </span>
                 <div>
                   <p>Reset password</p>
                   <h2>Recover your account</h2>
@@ -177,7 +174,7 @@ function AuthPage({
               </div>
 
               <button className="auth-submit" type="submit" disabled={forgotLoading}>
-                {forgotLoading ? <LogoMark className="button-logo" /> : <Icon name="key" />}
+                {forgotLoading && <LogoMark className="button-logo" />}
                 {forgotLoading ? 'Sending reset link...' : 'Send reset link'}
               </button>
               {forgotStatus && <span className="success-message">{forgotStatus}</span>}
@@ -377,7 +374,6 @@ function AuthPage({
                     Return page
                   </button>
                   <button disabled={isSignup || authLoading} onClick={() => toggleMode('forgot')} type="button">
-                    <Icon name="key" />
                     Forgot password?
                   </button>
                 </div>

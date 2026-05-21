@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import ReaderCommentsPanel from '../reader/ReaderCommentsPanel'
+import ReaderControls from '../reader/ReaderControls'
+import ReaderFrame from '../reader/ReaderFrame'
+import { NextChapterModal, ReaderMemberModal } from '../reader/ReaderModals'
+import ReaderTopbar from '../reader/ReaderTopbar'
 import { getReaderUrl } from '../../utils/bookUtils'
 import { getBookChapters, getChapterIndex, getTotalPages } from '../../utils/chapterUtils'
 
@@ -11,27 +16,29 @@ function ReaderPage({
   account,
   book,
   checkpoints,
+  comments = [],
   favorites,
   fontScale,
-  highlights = [],
-  notes,
   onBack,
+  onComment,
+  onDiscover,
   onFavorite,
-  onHighlight,
+  onHome,
   onLoginRequired,
   readerTheme,
   startPage,
   setCheckpoints,
   setFontScale,
-  setNotes,
   setProgress,
   setReaderTheme,
 }) {
-  const [quoteText, setQuoteText] = useState('')
+  const [commentText, setCommentText] = useState('')
   const [readerText, setReaderText] = useState('')
   const [readerStatus, setReaderStatus] = useState('idle')
   const [readerMessage, setReaderMessage] = useState('')
-  const [collapsedPageChapters, setCollapsedPageChapters] = useState({})
+  const [pendingChapterIndex, setPendingChapterIndex] = useState(null)
+  const [showMemberPrompt, setShowMemberPrompt] = useState(false)
+  const [commentSort, setCommentSort] = useState('newest')
   const activeBook = useMemo(() => book || { id: 'empty', title: '', formats: {} }, [book])
   const readerUrl = getReaderUrl(activeBook)
   const readerTextUrl = getReaderTextUrl(activeBook)
@@ -56,8 +63,16 @@ function ReaderPage({
   const hasReachedGuestLimit = isGuest && currentChapterNumber > GUEST_CHAPTER_LIMIT
   const isFinished = currentPage >= totalPages
   const progressValue = Math.round((currentPage / totalPages) * 100)
+  const chapterProgressValue = Math.round((chapterPage / currentChapter.pages) * 100)
   const currentReaderText = readerPages[currentPage - 1] || ''
   const currentReaderParagraphs = useMemo(() => getDisplayParagraphs(currentReaderText), [currentReaderText])
+  const chapterStrip = useMemo(() => getChapterStrip(chapters, currentChapterIndex), [chapters, currentChapterIndex])
+  const sortedComments = [...comments].sort((first, second) => {
+    const firstTime = new Date(first.createdAt).getTime()
+    const secondTime = new Date(second.createdAt).getTime()
+
+    return commentSort === 'newest' ? secondTime - firstTime : firstTime - secondTime
+  })
 
   const saveCheckpoint = useCallback(
     (page = currentPage) => {
@@ -179,27 +194,45 @@ function ReaderPage({
     const chapter = chapters[chapterIndex]
     if (!chapter) return
 
+    if (isGuest && chapterIndex + 1 > GUEST_CHAPTER_LIMIT) {
+      setShowMemberPrompt(true)
+      return
+    }
+
     setCurrentPage(chapter.startPage)
   }
 
-  function goToChapterPage(nextChapterPage) {
-    handlePageChange(currentChapter.startPage + nextChapterPage - 1)
-  }
-
-  function goToSidebarPage(chapter, nextChapterPage) {
-    handlePageChange(chapter.startPage + nextChapterPage - 1)
-  }
-
-  function toggleChapterPages(chapterId) {
-    setCollapsedPageChapters((current) => ({ ...current, [chapterId]: !current[chapterId] }))
-  }
-
   function movePage(direction) {
+    const nextChapterIndex = currentChapterIndex + 1
+
+    if (direction > 0 && chapterPage >= currentChapter.pages && nextChapterIndex < chapters.length) {
+      if (isGuest && currentChapterNumber >= GUEST_CHAPTER_LIMIT) {
+        setShowMemberPrompt(true)
+        return
+      }
+
+      setPendingChapterIndex(nextChapterIndex)
+      return
+    }
+
     handlePageChange(currentPage + direction)
+  }
+
+  function continueToPendingChapter() {
+    if (pendingChapterIndex === null) return
+
+    const chapter = chapters[pendingChapterIndex]
+    setPendingChapterIndex(null)
+    if (chapter) setCurrentPage(chapter.startPage)
   }
 
   function changeFontScale(direction) {
     setFontScale((current) => clampNumber(current + direction, 15, 24))
+  }
+
+  function markChapterDone() {
+    const finalChapterPage = currentChapter.startPage + currentChapter.pages - 1
+    handlePageChange(finalChapterPage)
   }
 
   function handleExit() {
@@ -207,222 +240,95 @@ function ReaderPage({
     onBack()
   }
 
-  function saveHighlight() {
-    const text = quoteText.trim()
+  function handleHome() {
+    saveCheckpoint(currentPage)
+    onHome()
+  }
+
+  function handleDiscover() {
+    saveCheckpoint(currentPage)
+    onDiscover()
+  }
+
+  function submitReaderComment() {
+    const text = commentText.trim()
     if (!text) return
 
-    onHighlight(activeBook.id, text, `${currentChapter.label}, page ${chapterPage}`)
-    setQuoteText('')
+    onComment(activeBook.id, text)
+    setCommentText('')
   }
 
   return (
     <section className={`reader-page reader-${readerTheme}`}>
-      <header className="reader-topbar">
-        <button className="ghost-button" onClick={handleExit} type="button">
-          <i className="bi bi-arrow-left" />
-          Exit reader
-        </button>
-        <div>
-          <p className="mono-eyebrow">Now reading</p>
-          <h1>{activeBook.title}</h1>
-        </div>
-        <button className="ghost-button" onClick={() => onFavorite(activeBook.id)} type="button">
-          <i className={`bi ${favorites.includes(activeBook.id) ? 'bi-bookmark-fill' : 'bi-bookmark'}`} />
-          Bookmark
-        </button>
-      </header>
+      <ReaderTopbar
+        activeBook={activeBook}
+        favorites={favorites}
+        onBack={handleExit}
+        onDiscover={handleDiscover}
+        onFavorite={onFavorite}
+        onHome={handleHome}
+      />
 
-      <div className="reader-controls">
-        <label>
-          Theme
-          <select value={readerTheme} onChange={(event) => setReaderTheme(event.target.value)}>
-            <option value="sepia">Sepia</option>
-            <option value="focus">Focus</option>
-            <option value="night">Night</option>
-          </select>
-        </label>
-        <label>
-          Font size
-          <div className="reader-font-controls">
-            <button disabled={fontScale <= 15} onClick={() => changeFontScale(-1)} type="button">A-</button>
-            <span>{fontScale}px</span>
-            <button disabled={fontScale >= 24} onClick={() => changeFontScale(1)} type="button">A+</button>
-          </div>
-        </label>
-        <label>
-          Chapter
-          <select value={currentChapterIndex} onChange={(event) => goToChapter(Number(event.target.value))}>
-            {chapters.map((chapter, index) => (
-              <option key={chapter.id} value={index}>
-                {chapter.title === chapter.label ? chapter.label : `${chapter.label} · ${chapter.title}`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="reader-page-meter">
-          <span>{currentChapter.label} · Page {chapterPage} / {currentChapter.pages}</span>
-          <progress max="100" value={progressValue} />
-          {isGuest && <small>Guest preview: first {GUEST_CHAPTER_LIMIT} chapters</small>}
-          {isFinished && <small className="finished-status">Finished</small>}
-        </div>
-      </div>
+      <ReaderControls
+        chapterPage={chapterPage}
+        chapterProgressValue={chapterProgressValue}
+        currentChapter={currentChapter}
+        fontScale={fontScale}
+        guestChapterLimit={GUEST_CHAPTER_LIMIT}
+        isFinished={isFinished}
+        isGuest={isGuest}
+        onChangeFontScale={changeFontScale}
+        onMarkChapterDone={markChapterDone}
+        onReaderTheme={setReaderTheme}
+        progressValue={progressValue}
+        readerTheme={readerTheme}
+      />
 
       <div className="reader-main">
-        <aside className="chapter-panel">
-          <div>
-            <p className="mono-eyebrow">Contents</p>
-            <h2>Chapters</h2>
-          </div>
-          <nav aria-label="Book chapters" className="chapter-list">
-            {chapters.map((chapter, index) => {
-              const isLocked = isGuest && index + 1 > GUEST_CHAPTER_LIMIT
-              const isActive = currentChapterIndex === index
-              const arePagesOpen = isActive && !collapsedPageChapters[chapter.id]
-
-              return (
-                <div className={`chapter-nav-group ${isActive ? 'active' : ''}`} key={chapter.id}>
-                  <button
-                    aria-expanded={isActive}
-                    className={`chapter-nav-button ${isActive ? 'active' : ''}`}
-                    onClick={() => goToChapter(index)}
-                    type="button"
-                  >
-                    <span className="chapter-nav-number">{chapter.number || index + 1}</span>
-                    <span className="chapter-nav-copy">
-                      <strong>{chapter.title}</strong>
-                      <small>{isLocked ? `starts page ${chapter.startPage}` : `${chapter.pages} pages · starts page ${chapter.startPage}`}</small>
-                    </span>
-                    {isLocked && <i className="bi bi-lock-fill" />}
-                  </button>
-                  {isActive && !isLocked && (
-                    <button
-                      aria-expanded={arePagesOpen}
-                      className="chapter-page-toggle"
-                      onClick={() => toggleChapterPages(chapter.id)}
-                      type="button"
-                    >
-                      <span>Page {chapterPage} / {chapter.pages}</span>
-                      <small>{chapter.pages} pages</small>
-                      <i className={`bi ${arePagesOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-                    </button>
-                  )}
-                  {arePagesOpen && (
-                    <div className="chapter-sidebar-pages" aria-label={`Pages in ${chapter.title}`}>
-                      {Array.from({ length: chapter.pages }, (_, pageIndex) => pageIndex + 1).map((page) => (
-                        <button
-                          aria-label={`${chapter.title}, page ${page}`}
-                          className={chapterPage === page ? 'active' : ''}
-                          key={`${chapter.id}-page-${page}`}
-                          onClick={() => goToSidebarPage(chapter, page)}
-                          type="button"
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </nav>
-        </aside>
-        <article className="reader-frame">
-          <div className="reader-chapter-header">
-            <div>
-              <p className="mono-eyebrow">Reading section</p>
-              <h2>{currentChapter.title}</h2>
-            </div>
-            <div className="reader-page-actions">
-              <button disabled={currentPage === 1} onClick={() => movePage(-1)} type="button">
-                <i className="bi bi-chevron-left" />
-              </button>
-              <span>Page {chapterPage}</span>
-              <button disabled={currentPage === totalPages} onClick={() => movePage(1)} type="button">
-                <i className="bi bi-chevron-right" />
-              </button>
-            </div>
-          </div>
-          {readerStatus === 'loading' ? (
-            <div className="reader-text-state">
-              <span className="reader-spinner" />
-              <p>Loading chapter text...</p>
-            </div>
-          ) : currentReaderParagraphs.length ? (
-            <div className="reader-text-page" aria-live="polite" style={{ fontSize: `${fontScale}px` }}>
-              <p className="reader-page-kicker">{currentChapter.title} · Page {chapterPage}</p>
-              {currentReaderParagraphs.map((paragraph, index) => (
-                <p key={`${currentPage}-${index}`}>{paragraph}</p>
-              ))}
-            </div>
-          ) : readerUrl ? (
-            <div className="reader-source-fallback">
-              <p>{readerMessage || 'Readable text is not available for this generated page.'}</p>
-              <a href={readerUrl} rel="noreferrer" target="_blank">Open original reader</a>
-              <iframe loading="lazy" src={readerUrl} title={`Read ${activeBook.title}`} />
-            </div>
-          ) : (
-            <p>This book does not include a readable text link.</p>
-          )}
-          <div className="chapter-page-grid" aria-label="Pages in current chapter">
-            {Array.from({ length: currentChapter.pages }, (_, index) => index + 1).map((page) => (
-              <button
-                className={chapterPage === page ? 'active' : ''}
-                key={page}
-                onClick={() => goToChapterPage(page)}
-                type="button"
-              >
-                {page}
-              </button>
-            ))}
-          </div>
-          {hasReachedGuestLimit && (
-            <div className="reader-lock">
-              <div>
-                <i className="bi bi-lock-fill" />
-                <h2>Login to keep reading</h2>
-                <p>Guest accounts can preview the first {GUEST_CHAPTER_LIMIT} chapters. Create or login to continue reading with saved progress.</p>
-                <button className="primary-button" onClick={onLoginRequired} type="button">
-                  <i className="bi bi-box-arrow-in-right" />
-                  Login to continue
-                </button>
-              </div>
-            </div>
-          )}
-        </article>
-        <aside className="notes-panel">
-          <h2>Notes</h2>
-          <div className="highlight-tool">
-            <label>
-              Quote highlight
-              <textarea
-                value={quoteText}
-                onChange={(event) => setQuoteText(event.target.value)}
-                placeholder="Paste a favorite line from the current page..."
-              />
-            </label>
-            <button className="primary-button" disabled={!quoteText.trim()} onClick={saveHighlight} type="button">
-              <i className="bi bi-highlighter" />
-              Save highlight
-            </button>
-          </div>
-          {highlights.length > 0 && (
-            <div className="reader-highlights">
-              <h3>Saved quotes</h3>
-              {highlights.slice(0, 3).map((highlight) => (
-                <blockquote key={highlight.id}>
-                  {highlight.text}
-                  <span>{highlight.location}</span>
-                </blockquote>
-              ))}
-            </div>
-          )}
-          <textarea
-            value={notes[activeBook.id] || ''}
-            onChange={(event) => setNotes((current) => ({ ...current, [activeBook.id]: event.target.value }))}
-            placeholder="Save quotes, thoughts, or chapter notes..."
-          />
-        </aside>
+        <ReaderFrame
+          activeBook={activeBook}
+          chapterPage={chapterPage}
+          chapterStrip={chapterStrip}
+          currentChapter={currentChapter}
+          currentChapterIndex={currentChapterIndex}
+          currentPage={currentPage}
+          currentReaderParagraphs={currentReaderParagraphs}
+          fontScale={fontScale}
+          guestChapterLimit={GUEST_CHAPTER_LIMIT}
+          hasReachedGuestLimit={hasReachedGuestLimit}
+          isGuest={isGuest}
+          onChapter={goToChapter}
+          onLoginRequired={onLoginRequired}
+          onMovePage={movePage}
+          readerMessage={readerMessage}
+          readerStatus={readerStatus}
+          readerUrl={readerUrl}
+          totalPages={totalPages}
+        />
+        <ReaderCommentsPanel
+          account={account}
+          commentSort={commentSort}
+          commentText={commentText}
+          comments={sortedComments}
+          onCommentSort={setCommentSort}
+          onCommentText={setCommentText}
+          onSubmitComment={submitReaderComment}
+        />
       </div>
+      {pendingChapterIndex !== null && (
+        <NextChapterModal
+          currentChapter={currentChapter}
+          nextChapter={chapters[pendingChapterIndex]}
+          onClose={() => setPendingChapterIndex(null)}
+          onContinue={continueToPendingChapter}
+        />
+      )}
+      {showMemberPrompt && (
+        <ReaderMemberModal
+          onClose={() => setShowMemberPrompt(false)}
+          onLoginRequired={onLoginRequired}
+        />
+      )}
     </section>
   )
 }
@@ -444,6 +350,20 @@ function getReaderTextUrl(book) {
     book.readerUrl ||
     ''
   )
+}
+
+function getChapterStrip(chapters, currentIndex) {
+  return [
+    { id: 'previous-chapter', index: currentIndex - 1, position: 'Previous' },
+    { id: 'current-chapter', index: currentIndex, position: 'Current' },
+    { id: 'next-chapter', index: currentIndex + 1, position: 'Next' },
+  ]
+    .filter((item) => item.index >= 0 && item.index < chapters.length)
+    .map((item) => ({
+      ...item,
+      chapter: chapters[item.index],
+      id: `${item.id}-${chapters[item.index].id}`,
+    }))
 }
 
 function getFormatUrl(formats, mimePrefix) {

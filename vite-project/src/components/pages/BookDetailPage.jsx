@@ -1,6 +1,11 @@
 import { useState } from 'react'
-import BookGrid from '../books/BookGrid'
-import { getAuthor, getCategory, getCover, getDescription } from '../../utils/bookUtils'
+import DetailChapters from '../detail/DetailChapters'
+import DetailComments, { COMMENT_PREVIEW_LIMIT } from '../detail/DetailComments'
+import DetailHero from '../detail/DetailHero'
+import DetailRecommendations from '../detail/DetailRecommendations'
+import DetailTabs from '../detail/DetailTabs'
+import MembershipRequiredModal from '../detail/MembershipRequiredModal'
+import { getAuthor, getCategory } from '../../utils/bookUtils'
 import { getBookChapters, getTotalPages } from '../../utils/chapterUtils'
 
 function BookDetailPage({
@@ -15,18 +20,25 @@ function BookDetailPage({
   onComment,
   onDetail,
   onFavorite,
+  onHome,
+  onAuth,
   onRead,
   viewCount = 0,
   viewCounts = {},
   viewerCounts = {},
 }) {
   const [commentText, setCommentText] = useState('')
+  const [showAllComments, setShowAllComments] = useState(false)
+  const [showSavePrompt, setShowSavePrompt] = useState(false)
+  const [showChapterPrompt, setShowChapterPrompt] = useState(false)
+  const [activeDetailTab, setActiveDetailTab] = useState('chapters')
+  const [commentSort, setCommentSort] = useState('newest')
 
   if (!book) {
     return (
       <div className="empty-state">
         Select a book first.
-        <button className="primary-button" onClick={onBack} type="button">Back to library</button>
+        <button className="primary-button" onClick={onHome || onBack} type="button">Go home</button>
       </div>
     )
   }
@@ -40,6 +52,14 @@ function BookDetailPage({
   const rating = Math.min(5, Math.max(3.8, (book.download_count || 1000) / 25000 + 3.6)).toFixed(1)
   const checkpointKey = getCheckpointKey(account, book)
   const checkpoint = account?.role === 'guest' ? null : checkpoints[checkpointKey]
+  const sortedComments = [...comments].sort((first, second) => {
+    const firstTime = new Date(first.createdAt).getTime()
+    const secondTime = new Date(second.createdAt).getTime()
+
+    return commentSort === 'newest' ? secondTime - firstTime : firstTime - secondTime
+  })
+  const visibleComments = showAllComments ? sortedComments : sortedComments.slice(0, COMMENT_PREVIEW_LIMIT)
+  const hasMoreComments = sortedComments.length > COMMENT_PREVIEW_LIMIT
   const recommendations = books
     .filter((item) => item.id !== book.id)
     .map((item) => ({
@@ -65,160 +85,83 @@ function BookDetailPage({
     setCommentText('')
   }
 
+  const handleSaveBook = () => {
+    if (account?.role === 'guest') {
+      setShowSavePrompt(true)
+      return
+    }
+
+    onFavorite(book.id)
+  }
+
+  const handleChapterClick = (chapter) => {
+    if (account?.role === 'guest' && chapter.number > 3) {
+      setShowChapterPrompt(true)
+      return
+    }
+
+    onChapter(book, chapter)
+  }
+
   return (
     <section className="detail-page">
-      <button className="ghost-button back-button" onClick={onBack} type="button">
-        <i className="bi bi-arrow-left" />
-        Back
-      </button>
+      <DetailHero
+        book={book}
+        checkpoint={checkpoint}
+        favorites={favorites}
+        language={language}
+        onAuth={onAuth}
+        onRead={onRead}
+        onSaveBook={handleSaveBook}
+        onToggleSavePrompt={setShowSavePrompt}
+        rating={rating}
+        readingTime={readingTime}
+        showSavePrompt={showSavePrompt}
+        totalChapters={totalChapters}
+        totalPages={totalPages}
+        totalReads={totalReads}
+      />
 
-      <div className="detail-layout">
-        <img loading="lazy" src={getCover(book)} alt={`${book.title} cover`} />
-        <div className="detail-copy">
-          <p className="mono-eyebrow">{getCategory(book)}</p>
-          <h1>{book.title}</h1>
-          <p className="detail-author">{getAuthor(book)}</p>
-          <div className="rating-row" aria-label={`${rating} out of 5 stars`}>
-            <span>{rating}</span>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <i className={`bi ${star <= Math.round(rating) ? 'bi-star-fill' : 'bi-star'}`} key={star} />
-            ))}
-            <small>{totalReads.toLocaleString()} reads</small>
-          </div>
-          <div className="detail-meta-grid">
-            <article>
-              <i className="bi bi-file-earmark-text" />
-              <strong>{totalPages}</strong>
-              <span>Pages</span>
-            </article>
-            <article>
-              <i className="bi bi-list-ol" />
-              <strong>{totalChapters}</strong>
-              <span>Chapters</span>
-            </article>
-            <article>
-              <i className="bi bi-translate" />
-              <strong>{language}</strong>
-              <span>Language</span>
-            </article>
-            <article>
-              <i className="bi bi-clock-history" />
-              <strong>{readingTime}m</strong>
-              <span>Est. read</span>
-            </article>
-          </div>
-          <p className="book-description">{getDescription(book)}</p>
-          {checkpoint && (
-            <div className="checkpoint-chip">
-              <i className="bi bi-bookmark-check" />
-              Continue from page {checkpoint.page}
-            </div>
-          )}
-          <div className="hero-actions">
-            <button className="primary-button" onClick={() => onRead(book)} type="button">
-              <i className="bi bi-journal-text" />
-              Read now
-            </button>
-            <button className="ghost-button" onClick={() => onFavorite(book.id)} type="button">
-              <i className={`bi ${favorites.includes(book.id) ? 'bi-bookmark-fill' : 'bi-bookmark'}`} />
-              {favorites.includes(book.id) ? 'Saved' : 'Save book'}
-            </button>
-          </div>
-        </div>
-      </div>
+      <DetailTabs activeTab={activeDetailTab} onChange={setActiveDetailTab} />
 
-      <section className="section-block detail-chapters-section">
-        <div className="section-heading">
-          <div>
-            <p className="mono-eyebrow">Table of contents</p>
-            <h2>Chapters</h2>
-          </div>
-          {account?.role === 'guest' && <span>Guest preview includes chapters 1-3</span>}
-        </div>
-        <div className="detail-chapter-grid">
-          {detailChapters.map((chapter) => (
-            <button key={chapter.id} onClick={() => onChapter(book, chapter)} type="button">
-              <span>{chapter.number}</span>
-              <div>
-                <strong>{chapter.title}</strong>
-                <small>{chapter.pages} pages · starts page {chapter.startPage}</small>
-              </div>
-              <i className={`bi ${account?.role === 'guest' && chapter.number > 3 ? 'bi-lock-fill' : 'bi-arrow-right'}`} />
-            </button>
-          ))}
-        </div>
-      </section>
+      {activeDetailTab === 'chapters' && (
+        <DetailChapters account={account} chapters={detailChapters} onChapterClick={handleChapterClick} />
+      )}
 
-      <section className="section-block comments-section">
-        <div className="section-heading">
-          <div>
-            <p className="mono-eyebrow">Reader voices</p>
-            <h2>Comments</h2>
-          </div>
-          <span>{comments.length} comments</span>
-        </div>
-        <form
-          className="comment-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            submitComment()
-          }}
-        >
-          <label>
-            {account?.role === 'guest' ? 'Comment as guest' : `Comment as ${account.name}`}
-            <textarea
-              value={commentText}
-              onChange={(event) => setCommentText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  submitComment()
-                }
-              }}
-              placeholder="Share what you think about this book..."
-            />
-          </label>
-          <button className="primary-button" disabled={!commentText.trim()} type="submit">
-            <i className="bi bi-chat-left-text" />
-            Post comment
-          </button>
-        </form>
-        {comments.length ? (
-          <div className="comment-list">
-            {comments.map((comment) => (
-              <article className="comment-item" key={comment.id}>
-                <div>
-                  <strong>{comment.author}</strong>
-                  <span>{comment.role === 'guest' ? 'Guest reader' : 'Member'}</span>
-                </div>
-                <p>{comment.text}</p>
-                <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleDateString()}</time>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">No comments yet. Start the conversation.</div>
-        )}
-      </section>
+      {activeDetailTab === 'comments' && (
+        <DetailComments
+          account={account}
+          commentSort={commentSort}
+          commentText={commentText}
+          comments={sortedComments}
+          hasMoreComments={hasMoreComments}
+          onCommentSort={setCommentSort}
+          onCommentText={setCommentText}
+          onSubmitComment={submitComment}
+          onToggleComments={() => setShowAllComments((current) => !current)}
+          showAllComments={showAllComments}
+          visibleComments={visibleComments}
+        />
+      )}
 
-      <section className="section-block recommendations-section">
-        <div className="section-heading">
-          <h2>More Books You Might Like</h2>
-        </div>
-        {recommendations.length ? (
-          <BookGrid
-            books={recommendations}
-            favorites={favorites}
-            onDetail={onDetail}
-            onFavorite={onFavorite}
-            onRead={onRead}
-            viewCounts={viewCounts}
-            viewerCounts={viewerCounts}
-          />
-        ) : (
-          <div className="empty-state">No similar books yet. Load more books in Discover to expand recommendations.</div>
-        )}
-      </section>
+      {activeDetailTab === 'more' && (
+        <DetailRecommendations
+          books={recommendations}
+          favorites={favorites}
+          onDetail={onDetail}
+          onFavorite={onFavorite}
+          onRead={onRead}
+          viewCounts={viewCounts}
+          viewerCounts={viewerCounts}
+        />
+      )}
+      {showChapterPrompt && (
+        <MembershipRequiredModal
+          id="detail-member-required-title"
+          onClose={() => setShowChapterPrompt(false)}
+          onLogin={onAuth}
+        />
+      )}
     </section>
   )
 }
