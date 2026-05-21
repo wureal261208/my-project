@@ -394,7 +394,7 @@ function AuthPage({
           <span><LogoMark /></span>
           <p>BookWorm Library</p>
           <h1>Welcome back</h1>
-          <small>Continue your shelf, notes, and favorite stories in one clean reading space.</small>
+          <small>Continue your shelf, comments, and favorite stories in one clean reading space. Personal notes are coming soon.</small>
         </div>
         <div className="content-panel signup-copy">
           <span><LogoMark /></span>

@@ -12,6 +12,7 @@ const navItems = [
 function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme = 'paper' }) {
   const { activePage, isPageLoading, navigateTo } = useNavigation()
   const isGuest = account?.role === 'guest'
+  const isAdminPage = activePage === 'admin'
   const displayName = account?.name || 'None Account'
   const visibleNavItems = ['admin', 'profile'].includes(activePage)
     ? navItems.filter((item) => item.id === activePage || (activePage === 'admin' && item.id === 'profile'))
@@ -20,7 +21,7 @@ function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme =
   return (
     <div className={`book-app app-theme-${websiteTheme}`}>
       <header className="site-header">
-        <button className="brand-button" onClick={() => navigateTo('home')} type="button">
+        <button className="brand-button" onClick={() => !isAdminPage && navigateTo('home')} type="button">
           <img src={logo} alt="BookWorm logo" />
           <span>BookWorm</span>
         </button>
@@ -44,39 +45,41 @@ function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme =
           })}
         </nav>
 
-        <div className="header-account">
-          <button className="avatar-chip" onClick={() => (isGuest ? onAuth() : navigateTo('profile'))} type="button">
-            <span>
-              {account?.avatar ? <img src={account.avatar} alt="" /> : getInitials(displayName)}
-            </span>
-            <strong>{displayName}</strong>
-          </button>
-          {isGuest ? (
-            <>
-              <button className="ghost-button" onClick={onGuest} type="button">
-                None account
-              </button>
-              <button className="primary-button" onClick={onAuth} type="button">
-                Login
-              </button>
-            </>
-          ) : (
-            <button className="ghost-button" onClick={onLogout} type="button">
-              Logout
+        {!isAdminPage && (
+          <div className="header-account">
+            <button className="avatar-chip" onClick={() => (isGuest ? onAuth() : navigateTo('profile'))} type="button">
+              <span>
+                {account?.avatar ? <img src={account.avatar} alt="" /> : getInitials(displayName)}
+              </span>
+              <strong>{displayName}</strong>
             </button>
-          )}
-        </div>
+            {isGuest ? (
+              <>
+                <button className="ghost-button" onClick={onGuest} type="button">
+                  None account
+                </button>
+                <button className="primary-button" onClick={onAuth} type="button">
+                  Login
+                </button>
+              </>
+            ) : (
+              <button className="ghost-button" onClick={onLogout} type="button">
+                Logout
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       <main className="page-shell">{children}</main>
-      <footer className="site-footer">
+      {!isAdminPage && <footer className="site-footer">
         <section className="footer-brand">
           <div className="footer-logo">
             <img src={logo} alt="BookWorm logo" />
           </div>
           <div>
             <strong>BookWorm</strong>
-            <p>A focused digital library for keeping books, notes, comments, and checkpoints in one quiet place.</p>
+            <p>A focused digital library for keeping books, comments, and checkpoints in one quiet place.</p>
           </div>
         </section>
         <section className="footer-columns">
@@ -94,11 +97,11 @@ function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme =
           <div>
             <span>Reader tools</span>
             <p>Checkpoint sync</p>
-            <p>Personal notes</p>
+            <p>Personal notes - Coming soon</p>
             <p>Community comments</p>
           </div>
         </section>
-      </footer>
+      </footer>}
       {isPageLoading && (
         <div className="route-loader" role="status">
           <img src={logo} alt="BookWorm logo" />
