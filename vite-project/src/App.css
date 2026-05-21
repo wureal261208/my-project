@@ -2825,6 +2825,8 @@ progress {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  max-height: 106px;
+  overflow: auto;
   padding: 10px 14px;
   border-bottom: 1px solid #d8d8d3;
   background: #fbfbf8;
@@ -3724,9 +3726,18 @@ progress {
     min-height: 0;
   }
 
+/* HEAD */
   .reader-comments-panel {
     min-height: 360px;
     max-height: 460px;
+  }
+  .reader-main .chapter-panel {
+    display: none;
+  }
+
+  .reader-main .notes-panel {
+    min-height: auto;
+    max-height: 360px;
   }
 
   .reader-page .reader-frame {

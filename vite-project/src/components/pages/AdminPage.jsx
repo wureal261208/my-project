@@ -78,7 +78,7 @@ function AdminPage({
 
       <div className="admin-two-col">
         <section className="admin-table">
-          <h2>Local books</h2>
+          <h2>Firebase books</h2>
           {localBooks.length ? (
             localBooks.map((book) => (
               <div className="table-row" key={book.id}>
@@ -88,7 +88,7 @@ function AdminPage({
               </div>
             ))
           ) : (
-            <p>No admin books yet.</p>
+            <p>No Firebase admin books yet.</p>
           )}
         </section>
 

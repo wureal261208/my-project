@@ -1,25 +1,5 @@
 export const API_URL = 'https://gutendex.com/books'
 
-export const STORAGE_KEYS = {
-  account: 'bookworm-current-account',
-  accountSettings: 'bookworm-account-settings',
-  websiteTheme: 'bookworm-website-theme',
-  accounts: 'bookworm-accounts',
-  library: 'bookworm-local-library',
-  favorites: 'bookworm-favorites',
-  history: 'bookworm-history',
-  readingActivity: 'bookworm-reading-activity',
-  views: 'bookworm-views',
-  readers: 'bookworm-readers',
-  progress: 'bookworm-progress',
-  checkpoints: 'bookworm-checkpoints',
-  notes: 'bookworm-notes',
-  highlights: 'bookworm-highlights',
-  comments: 'bookworm-comments',
-  searchHistory: 'bookworm-search-history',
-  staff: 'bookworm-staff',
-}
-
 export const fallbackBooks = [
   {
     id: 84,
