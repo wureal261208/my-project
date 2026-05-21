@@ -19,7 +19,7 @@ import {
 } from './data/bookData'
 import { NavigationProvider } from './context/NavigationContext'
 import { auth } from './firebase'
-import { getAuthor, getCategory } from './utils/bookUtils'
+import { getAuthor, getCategory, getReaderUrl } from './utils/bookUtils'
 import {
   globalDataDefaults,
   saveGlobalData,
@@ -44,11 +44,18 @@ const emptyAdminBook = {
   title: '',
   author: '',
   category: '',
+  description: '',
+  subjects: '',
+  language: 'en',
+  status: 'draft',
   readerUrl: '',
   cover: '',
   pageCount: '',
   chapterCount: '',
+  chapterTitles: '',
   readerText: '',
+  chapterText: '',
+  chaptersDraft: [{ title: 'Chapter 1', pages: '10', content: '' }],
 }
 const guestAccount = { id: 'guest', name: 'None Account', email: 'guest@bookworm.local', role: 'guest' }
 const pageInitialState = { activePage: 'home', isPageLoading: false }
@@ -381,7 +388,11 @@ function App() {
     saveUserData(account.id, userData).catch(handleDataSyncError)
   }, [account.id, account.role, handleDataSyncError, userData, userDataReady])
 
-  const allBooks = useMemo(() => [...localBooks, ...books], [books, localBooks])
+  const publishedLocalBooks = useMemo(
+    () => localBooks.filter((book) => (book.status || 'published') === 'published'),
+    [localBooks],
+  )
+  const allBooks = useMemo(() => [...publishedLocalBooks, ...books], [books, publishedLocalBooks])
   const topics = useMemo(() => ['all', ...new Set(allBooks.map(getCategory).slice(0, 12))], [allBooks])
   const filteredBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -607,31 +618,34 @@ function App() {
     event.preventDefault()
     if (!adminBook.title.trim()) return
 
-    const cover = adminBook.cover.trim()
-    const readerText = adminBook.readerText.trim()
-    const readerUrl = adminBook.readerUrl.trim()
-    const pageCount = getPositiveInteger(adminBook.pageCount)
-    const chapterCount = getPositiveInteger(adminBook.chapterCount)
+    const nextBook = createAdminBookRecord(adminBook)
 
-    const nextBook = {
-      ...adminBook,
-      id: `local-${Date.now()}`,
-      title: adminBook.title.trim(),
-      author: adminBook.author.trim() || 'BookWorm editor',
-      category: adminBook.category.trim() || 'Admin pick',
-      ...(pageCount ? { pageCount } : {}),
-      ...(chapterCount ? { chapterCount } : {}),
-      ...(readerText ? { readerText } : {}),
-      download_count: 0,
-      formats: {
-        ...(cover ? { 'image/jpeg': cover } : {}),
-        ...(readerUrl ? { [getReaderFormatKey(readerUrl)]: readerUrl } : {}),
-      },
-    }
+    setLocalBooks((current) => {
+      const exists = current.some((book) => book.id === nextBook.id)
+      if (exists) return current.map((book) => (book.id === nextBook.id ? nextBook : book))
 
-    setLocalBooks((current) => [nextBook, ...current])
+      return [nextBook, ...current]
+    })
     setAdminBook(emptyAdminBook)
-    setToast({ type: 'success', message: 'Book pushed to the Firebase catalog.' })
+    setToast({ type: 'success', message: nextBook.status === 'published' ? 'Book published to the main site.' : 'Book saved in Admin.' })
+  }
+
+  function editLocalBook(book) {
+    setAdminBook({
+      ...emptyAdminBook,
+      ...book,
+      author: getAuthor(book),
+      category: getCategory(book),
+      cover: book.formats?.['image/jpeg'] || book.cover || '',
+      readerUrl: getReaderUrl(book),
+      subjects: Array.isArray(book.subjects) ? book.subjects.join(', ') : book.subjects || '',
+      language: book.languages?.[0] || book.language || 'en',
+      status: book.status || 'published',
+      chapterTitles: Array.isArray(book.chapterList) ? book.chapterList.map((chapter) => chapter.title).join('\n') : book.chapterTitles || '',
+      chapterText: Array.isArray(book.chapterList) ? book.chapterList.map((chapter) => chapter.content).filter(Boolean).join('\n--- chapter ---\n') : book.chapterText || '',
+      chaptersDraft: getEditableChapters(book),
+    })
+    setToast({ type: 'success', message: 'Book loaded into the editor.' })
   }
 
   function jumpPage(page, nextTopic) {
@@ -784,6 +798,8 @@ function App() {
         books={allBooks}
         localBooks={localBooks}
         removeLocalBook={(id) => setLocalBooks((current) => current.filter((book) => book.id !== id))}
+        editLocalBook={editLocalBook}
+        resetAdminBook={() => setAdminBook(emptyAdminBook)}
         setAdminBook={setAdminBook}
         setStaff={setStaff}
         staff={staff}
@@ -833,6 +849,126 @@ function getGuestCommentName(bookId, commentIndex) {
 function getPositiveInteger(value) {
   const number = Number(value)
   return Number.isFinite(number) && number > 0 ? Math.floor(number) : null
+}
+
+function createAdminBookRecord(adminBook) {
+  const cover = adminBook.cover.trim()
+  const readerText = adminBook.readerText.trim()
+  const chapterText = adminBook.chapterText.trim()
+  const readerUrl = adminBook.readerUrl.trim()
+  const explicitChapters = normalizeAdminDraftChapters(adminBook.chaptersDraft)
+  const fallbackPageCount = getPositiveInteger(adminBook.pageCount)
+  const fallbackChapterCount = getPositiveInteger(adminBook.chapterCount)
+  const chapterList = explicitChapters.length
+    ? explicitChapters
+    : createAdminChapters(adminBook.chapterTitles, chapterText, fallbackPageCount, fallbackChapterCount)
+  const pageCount = chapterList.reduce((total, chapter) => total + chapter.pages, 0) || fallbackPageCount
+  const chapterCount = chapterList.length || fallbackChapterCount
+  const subjects = adminBook.subjects
+    .split(',')
+    .map((subject) => subject.trim())
+    .filter(Boolean)
+  const language = adminBook.language.trim().toLowerCase()
+  const author = adminBook.author.trim() || 'BookWorm editor'
+  const category = adminBook.category.trim() || 'Admin pick'
+
+  return {
+    ...adminBook,
+    id: adminBook.id || `local-${Date.now()}`,
+    title: adminBook.title.trim(),
+    author,
+    category,
+    authors: [{ name: author }],
+    bookshelves: [category],
+    description: adminBook.description.trim(),
+    subjects,
+    languages: [language || 'en'],
+    status: adminBook.status || 'draft',
+    ...(pageCount ? { pageCount } : {}),
+    ...(chapterCount ? { chapterCount } : {}),
+    ...(chapterList.length ? { chapterList } : {}),
+    ...(readerText ? { readerText } : {}),
+    download_count: adminBook.download_count || 0,
+    formats: {
+      ...(cover ? { 'image/jpeg': cover } : {}),
+      ...(readerUrl ? { [getReaderFormatKey(readerUrl)]: readerUrl } : {}),
+    },
+  }
+}
+
+function createAdminChapters(titleSource, contentSource, pageCount, chapterCount) {
+  const titles = titleSource
+    .split('\n')
+    .map((title) => title.trim())
+    .filter(Boolean)
+  const contentBlocks = contentSource
+    .split(/\n-{3,}\s*(?:chapter)?\s*-{0,}\n/i)
+    .map((content) => content.trim())
+    .filter(Boolean)
+  const totalChapters = Math.max(titles.length, contentBlocks.length, chapterCount || 0)
+
+  if (!totalChapters) return []
+
+  const safePageCount = pageCount || totalChapters
+  const basePages = Math.max(1, Math.floor(safePageCount / totalChapters))
+  const extraPages = safePageCount % totalChapters
+  let startPage = 1
+
+  return Array.from({ length: totalChapters }, (_, index) => {
+    const pages = basePages + (index < extraPages ? 1 : 0)
+    const chapter = {
+      number: index + 1,
+      title: titles[index] || `Chapter ${index + 1}`,
+      startPage,
+      pages,
+      content: contentBlocks[index] || '',
+    }
+
+    startPage += pages
+    return chapter
+  })
+}
+
+function normalizeAdminDraftChapters(chapters = []) {
+  let startPage = 1
+
+  return chapters
+    .map((chapter, index) => {
+      const title = String(chapter.title || '').trim()
+      const content = String(chapter.content || '').trim()
+      const pages = getPositiveInteger(chapter.pages) || 1
+
+      if (!title && !content) return null
+
+      const nextChapter = {
+        number: index + 1,
+        title: title || `Chapter ${index + 1}`,
+        startPage,
+        pages,
+        content,
+      }
+
+      startPage += pages
+      return nextChapter
+    })
+    .filter(Boolean)
+}
+
+function getEditableChapters(book) {
+  if (Array.isArray(book.chapterList) && book.chapterList.length) {
+    return book.chapterList.map((chapter, index) => ({
+      title: chapter.title || `Chapter ${index + 1}`,
+      pages: String(chapter.pages || 1),
+      content: chapter.content || '',
+    }))
+  }
+
+  const count = getPositiveInteger(book.chapterCount) || 1
+  return Array.from({ length: count }, (_, index) => ({
+    title: `Chapter ${index + 1}`,
+    pages: String(Math.max(1, Math.floor((getPositiveInteger(book.pageCount) || count) / count))),
+    content: '',
+  }))
 }
 
 function getReaderFormatKey(readerUrl) {

@@ -13,6 +13,9 @@ function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme =
   const { activePage, isPageLoading, navigateTo } = useNavigation()
   const isGuest = account?.role === 'guest'
   const displayName = account?.name || 'None Account'
+  const visibleNavItems = ['admin', 'profile'].includes(activePage)
+    ? navItems.filter((item) => item.id === activePage || (activePage === 'admin' && item.id === 'profile'))
+    : navItems
 
   return (
     <div className={`book-app app-theme-${websiteTheme}`}>
@@ -23,7 +26,7 @@ function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme =
         </button>
 
         <nav className="main-nav" aria-label="Main navigation">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             if (item.admin && account?.role !== 'admin') return null
             if (item.private && isGuest) return null
 
@@ -79,9 +82,14 @@ function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme =
         <section className="footer-columns">
           <nav aria-label="Footer navigation">
             <span>Explore</span>
-            <button className="footer-link" onClick={() => navigateTo('home')} type="button">Home</button>
-            <button className="footer-link" onClick={() => navigateTo('discover')} type="button">Discover</button>
+            {!['admin', 'profile'].includes(activePage) && (
+              <>
+                <button className="footer-link" onClick={() => navigateTo('home')} type="button">Home</button>
+                <button className="footer-link" onClick={() => navigateTo('discover')} type="button">Discover</button>
+              </>
+            )}
             {!isGuest && <button onClick={() => navigateTo('profile')} type="button">Profile</button>}
+            {activePage === 'admin' && <button onClick={() => navigateTo('admin')} type="button">Admin</button>}
           </nav>
           <div>
             <span>Reader tools</span>

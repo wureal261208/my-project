@@ -3545,6 +3545,397 @@ progress {
   margin: 18px 0;
 }
 
+.admin-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  gap: 18px;
+  align-items: end;
+}
+
+.admin-title p:last-child {
+  margin: 0;
+  color: #555550;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.admin-sticky-switcher {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 6px;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 34px rgba(17, 17, 17, 0.08);
+}
+
+.admin-sticky-switcher button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #555550;
+  font-weight: 950;
+}
+
+.admin-sticky-switcher button.active,
+.admin-sticky-switcher button:hover {
+  background: #111111;
+  color: #ffffff;
+}
+
+.admin-workspace {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.admin-workspace > .section-heading {
+  margin-bottom: 0;
+}
+
+.admin-workspace > .section-heading > span {
+  color: #555550;
+  font-weight: 900;
+}
+
+.admin-book-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.admin-book-form fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: #fbfbf8;
+}
+
+.admin-book-form legend {
+  padding: 0 6px;
+  color: #111111;
+  font-weight: 950;
+}
+
+.admin-book-form textarea {
+  min-height: 108px;
+}
+
+.admin-choice-field {
+  display: grid;
+  gap: 8px;
+  color: #333333;
+  font-weight: 900;
+}
+
+.admin-choice-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-choice-grid button {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #d8d8d3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #555550;
+  font-weight: 950;
+}
+
+.admin-choice-grid button.active {
+  border-color: #16a09a;
+  background: #eefaf8;
+  color: #146b66;
+}
+
+.admin-choice-grid button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.admin-validation-panel {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: #fbfbf8;
+}
+
+.admin-validation-panel strong {
+  color: #111111;
+}
+
+.admin-validation-panel span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #555550;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.admin-validation-panel i {
+  color: #16a09a;
+}
+
+.admin-book-form .wide-field,
+.admin-submit-button {
+  grid-column: 1 / -1;
+}
+
+.admin-form-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.admin-chapter-fieldset {
+  grid-column: 1 / -1;
+}
+
+.admin-chapter-list {
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+}
+
+.admin-chapter-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.admin-chapter-heading,
+.admin-chapter-editor .wide-field {
+  grid-column: 1 / -1;
+}
+
+.admin-chapter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-chapter-heading strong {
+  color: #111111;
+}
+
+.admin-chapter-editor textarea {
+  min-height: 150px;
+}
+
+.admin-add-chapter {
+  grid-column: 1 / -1;
+  width: fit-content;
+}
+
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-filter-bar button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d8d8d3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #555550;
+  font-weight: 950;
+}
+
+.admin-filter-bar button.active,
+.admin-filter-bar button:hover {
+  border-color: #111111;
+  background: #111111;
+  color: #ffffff;
+}
+
+.admin-book-row {
+  grid-template-columns: 48px minmax(0, 1fr) minmax(180px, 0.55fr) minmax(210px, auto);
+}
+
+.admin-book-row img {
+  width: 48px;
+  height: 64px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #d8d8d3;
+}
+
+.admin-book-row span {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-status {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #ecece8;
+  color: #555550;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.status-published {
+  background: #eefaf8;
+  color: #146b66;
+}
+
+.status-hidden {
+  background: #f6ecec;
+  color: #9a2f2f;
+}
+
+.admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.admin-row-actions strong {
+  display: inline-flex;
+  align-items: center;
+  color: #9a6b14;
+  font-size: 12px;
+}
+
+.admin-guidelines {
+  align-content: start;
+}
+
+.admin-check-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid #ddddda;
+  color: #3f3f3a;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.admin-check-row i {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 6px;
+  background: #eefaf8;
+  color: #146b66;
+}
+
+.admin-preview-backdrop {
+  z-index: 80;
+}
+
+.admin-preview-modal {
+  position: relative;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 18px;
+  width: min(760px, 100%);
+  padding: 22px;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+  animation: pageRise 0.22s ease both;
+}
+
+.admin-preview-modal > img {
+  width: 180px;
+  height: 250px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #d8d8d3;
+}
+
+.admin-preview-modal h2,
+.admin-preview-modal p {
+  margin: 0;
+}
+
+.admin-preview-modal h2 {
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1;
+}
+
+.admin-preview-modal p {
+  margin-top: 10px;
+  color: #555550;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.admin-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.admin-preview-meta span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eefaf8;
+  color: #146b66;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.admin-preview-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: #f2f2ed;
+  color: #111111;
+}
+
 .compact-form {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -3673,6 +4064,40 @@ progress {
   .reader-main,
   .admin-two-col {
     grid-template-columns: 1fr;
+  }
+
+  .admin-title,
+  .admin-book-form,
+  .admin-book-form fieldset,
+  .admin-book-row,
+  .admin-chapter-editor,
+  .admin-preview-modal {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-submit-button,
+  .admin-form-actions .primary-button,
+  .admin-form-actions .ghost-button {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .admin-form-actions {
+    justify-content: stretch;
+  }
+
+  .admin-sticky-switcher {
+    top: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-add-chapter {
+    width: 100%;
+  }
+
+  .admin-preview-modal > img {
+    width: 100%;
+    height: min(56vw, 320px);
   }
 
   .main-nav {

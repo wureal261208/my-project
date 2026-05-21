@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getAuthor, getCover, getInitials } from '../../utils/bookUtils'
+import { getInitials } from '../../utils/bookUtils'
 
 const AVATAR_MAX_SIZE = 2 * 1024 * 1024
 const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -9,127 +9,29 @@ const DISPLAY_NAME_PATTERN = /^[\p{L}\p{N} ._'-]+$/u
 
 function ProfilePage({
   account,
-  books,
-  favorites,
   fontScale,
-  highlights = {},
-  history,
   onProfileUpdate,
-  onRead,
   onResetPassword,
-  progress,
   readerTheme,
-  readingDays = [],
   setFontScale,
   setReaderTheme,
   setWebsiteTheme,
-  viewCounts,
   websiteTheme,
 }) {
-  const [activeTab, setActiveTab] = useState('overview')
-  const savedBooks = books.filter((book) => favorites.includes(book.id))
-  const readingBooks = books.filter((book) => (progress[book.id] || 0) > 0 && (progress[book.id] || 0) < 100)
-  const finishedBooks = books.filter((book) => (progress[book.id] || 0) >= 100)
-  const recentBooks = history.map((id) => books.find((book) => book.id === id)).filter(Boolean).slice(0, 6)
-  const streak = getReadingStreak(readingDays)
-  const highlightList = Object.values(highlights)
-    .flat()
-    .map((highlight) => ({ ...highlight, book: books.find((book) => book.id === highlight.bookId) }))
-    .filter((highlight) => highlight.book)
-    .slice(0, 6)
-
   return (
-    <div className="profile-page">
-      <ProfileHero account={account} />
-
-      <div className="profile-tabs" role="tablist" aria-label="Profile sections">
-        {[
-          ['overview', 'Overview', 'bi-grid-1x2'],
-          ['settings', 'Settings', 'bi-sliders'],
-        ].map(([id, label, icon]) => (
-          <button
-            aria-selected={activeTab === id}
-            className={activeTab === id ? 'active' : ''}
-            key={id}
-            onClick={() => setActiveTab(id)}
-            role="tab"
-            type="button"
-          >
-            <i className={`bi ${icon}`} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'overview' ? (
-        <ProfileOverview
-          finishedBooks={finishedBooks}
-          highlightList={highlightList}
-          onRead={onRead}
-          progress={progress}
-          readingBooks={readingBooks}
-          recentBooks={recentBooks}
-          savedBooks={savedBooks}
-          streak={streak}
-          viewCounts={viewCounts}
-        />
-      ) : (
-        <ProfileSettings
-          account={account}
-          fontScale={fontScale}
-          onProfileUpdate={onProfileUpdate}
-          onResetPassword={onResetPassword}
-          readerTheme={readerTheme}
-          setFontScale={setFontScale}
-          setReaderTheme={setReaderTheme}
-          setWebsiteTheme={setWebsiteTheme}
-          websiteTheme={websiteTheme}
-        />
-      )}
+    <div className="profile-page settings-only-page">
+      <ProfileSettings
+        account={account}
+        fontScale={fontScale}
+        onProfileUpdate={onProfileUpdate}
+        onResetPassword={onResetPassword}
+        readerTheme={readerTheme}
+        setFontScale={setFontScale}
+        setReaderTheme={setReaderTheme}
+        setWebsiteTheme={setWebsiteTheme}
+        websiteTheme={websiteTheme}
+      />
     </div>
-  )
-}
-
-function ProfileHero({ account }) {
-  return (
-    <section className="profile-hero">
-      <div className="profile-avatar">
-        {account.avatar ? <img src={account.avatar} alt="" /> : getInitials(account.name)}
-      </div>
-      <div>
-        <p className="mono-eyebrow">My account</p>
-        <h1>{account.name}</h1>
-        <p>{account.email}</p>
-      </div>
-    </section>
-  )
-}
-
-function ProfileOverview({
-  finishedBooks,
-  highlightList,
-  onRead,
-  progress,
-  readingBooks,
-  recentBooks,
-  savedBooks,
-  streak,
-  viewCounts,
-}) {
-  return (
-    <section className="profile-overview" role="tabpanel">
-      <section className="metrics">
-        <article><strong>{savedBooks.length}</strong><span>Saved books</span></article>
-        <article><strong>{streak}</strong><span>Day streak</span></article>
-        <article><strong>{readingBooks.length}</strong><span>Reading</span></article>
-        <article><strong>{finishedBooks.length}</strong><span>Finished</span></article>
-      </section>
-
-      <ProfileShelf title="My shelf" books={savedBooks} onRead={onRead} progress={progress} viewCounts={viewCounts} />
-      <ProfileShelf title="Currently reading" books={readingBooks} onRead={onRead} progress={progress} viewCounts={viewCounts} />
-      <HighlightShelf highlights={highlightList} />
-      <ProfileShelf title="History" books={recentBooks} onRead={onRead} progress={progress} viewCounts={viewCounts} />
-    </section>
   )
 }
 
@@ -210,7 +112,7 @@ function ProfileSettings({
     <section className="settings-panel profile-settings" role="tabpanel">
       <div className="settings-intro">
         <div>
-          <p className="mono-eyebrow">Control center</p>
+          <p className="mono-eyebrow">My account</p>
           <h2>Account settings</h2>
           <p>Keep your profile, password, reading comfort, and site appearance in one place.</p>
         </div>
@@ -326,75 +228,6 @@ function SettingsHeading({ icon, kicker, title }) {
       </div>
     </div>
   )
-}
-
-function HighlightShelf({ highlights }) {
-  return (
-    <section className="section-block">
-      <div className="section-heading">
-        <h2>Quote highlights</h2>
-      </div>
-      {highlights.length ? (
-        <div className="highlight-list">
-          {highlights.map((highlight) => (
-            <article className="highlight-item" key={highlight.id}>
-              <img loading="lazy" src={getCover(highlight.book)} alt={`${highlight.book.title} cover`} />
-              <div>
-                <strong>{highlight.book.title}</strong>
-                <p>{highlight.text}</p>
-                <small>{highlight.location}</small>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state">No highlights yet.</div>
-      )}
-    </section>
-  )
-}
-
-function ProfileShelf({ books, onRead, progress, title, viewCounts }) {
-  return (
-    <section className="section-block">
-      <div className="section-heading">
-        <h2>{title}</h2>
-      </div>
-      {books.length ? (
-        <div className="shelf-list">
-          {books.map((book) => (
-            <article className="shelf-item" key={book.id}>
-              <img loading="lazy" src={getCover(book)} alt={`${book.title} cover`} />
-              <div>
-                <h2>{book.title}</h2>
-                <p>{getAuthor(book)}</p>
-                <small>{((book.download_count || 0) + (viewCounts?.[book.id] || 0)).toLocaleString()} reads</small>
-                <progress max="100" value={progress[book.id] || 0} />
-              </div>
-              <button className="primary-button" onClick={() => onRead(book)} type="button">
-                Read
-              </button>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state">Nothing here yet.</div>
-      )}
-    </section>
-  )
-}
-
-function getReadingStreak(days) {
-  const daySet = new Set(days)
-  const cursor = new Date()
-  let streak = 0
-
-  while (daySet.has(cursor.toISOString().slice(0, 10))) {
-    streak += 1
-    cursor.setDate(cursor.getDate() - 1)
-  }
-
-  return streak
 }
 
 function normalizeDisplayName(name) {
