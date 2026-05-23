@@ -5,7 +5,7 @@
       "destination": "/api/reader-text"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
