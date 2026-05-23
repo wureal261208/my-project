@@ -27,10 +27,12 @@ function ReaderPage({
   onFavorite,
   onHome,
   onLoginRequired,
+  readerFontSize,
   readerTheme,
   startPage,
   setCheckpoints,
   setProgress,
+  setReaderFontSize,
   setReaderTheme,
 }) {
   const [commentText, setCommentText] = useState('')
@@ -281,7 +283,10 @@ function ReaderPage({
   }
 
   return (
-    <section className={`reader-page reader-${readerTheme}`}>
+    <section
+      className={`reader-page reader-${readerTheme}`}
+      style={{ '--reader-font-size': `${readerFontSize}px` }}
+    >
       <ReaderTopbar
         activeBook={activeBook}
         favorites={favorites}
@@ -302,8 +307,10 @@ function ReaderPage({
         isGuest={isGuest}
         onChapter={goToChapter}
         onMarkChapterDone={markChapterDone}
+        onReaderFontSize={setReaderFontSize}
         onReaderTheme={setReaderTheme}
         progressValue={progressValue}
+        readerFontSize={readerFontSize}
         readerTheme={readerTheme}
       />
 

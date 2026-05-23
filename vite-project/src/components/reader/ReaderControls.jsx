@@ -9,8 +9,10 @@ function ReaderControls({
   isGuest,
   onChapter,
   onMarkChapterDone,
+  onReaderFontSize,
   onReaderTheme,
   progressValue,
+  readerFontSize,
   readerTheme,
 }) {
   return (
@@ -22,6 +24,17 @@ function ReaderControls({
             <option value="sepia">Sepia</option>
             <option value="focus">Focus</option>
             <option value="night">Night</option>
+          </select>
+        </label>
+      </div>
+      <div className="reader-control-card reader-font-size-control">
+        <label>
+          Font size
+          <select value={readerFontSize} onChange={(event) => onReaderFontSize(Number(event.target.value))}>
+            <option value="16">Small</option>
+            <option value="18">Medium</option>
+            <option value="20">Large</option>
+            <option value="24">Extra large</option>
           </select>
         </label>
       </div>

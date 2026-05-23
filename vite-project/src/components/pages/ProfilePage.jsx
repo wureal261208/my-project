@@ -11,7 +11,9 @@ function ProfilePage({
   account,
   onProfileUpdate,
   onResetPassword,
+  readerFontSize,
   readerTheme,
+  setReaderFontSize,
   setReaderTheme,
   setWebsiteTheme,
   websiteTheme,
@@ -22,7 +24,9 @@ function ProfilePage({
         account={account}
         onProfileUpdate={onProfileUpdate}
         onResetPassword={onResetPassword}
+        readerFontSize={readerFontSize}
         readerTheme={readerTheme}
+        setReaderFontSize={setReaderFontSize}
         setReaderTheme={setReaderTheme}
         setWebsiteTheme={setWebsiteTheme}
         websiteTheme={websiteTheme}
@@ -35,7 +39,9 @@ function ProfileSettings({
   account,
   onProfileUpdate,
   onResetPassword,
+  readerFontSize,
   readerTheme,
+  setReaderFontSize,
   setReaderTheme,
   setWebsiteTheme,
   websiteTheme,
@@ -168,8 +174,20 @@ function ProfileSettings({
                 <option value="night">Night</option>
               </select>
             </label>
+            <label>
+              Font size
+              <select value={readerFontSize} onChange={(event) => setReaderFontSize(Number(event.target.value))}>
+                <option value="16">Small</option>
+                <option value="18">Medium</option>
+                <option value="20">Large</option>
+                <option value="24">Extra large</option>
+              </select>
+            </label>
           </div>
-          <div className={`settings-reader-preview reader-${readerTheme}`}>
+          <div
+            className={`settings-reader-preview reader-${readerTheme}`}
+            style={{ '--reader-font-size': `${readerFontSize}px` }}
+          >
             <p className="mono-eyebrow">Chapter preview</p>
             <h4>A quiet page for focused reading</h4>
             <p>Reader mode syncs with the reading screen.</p>

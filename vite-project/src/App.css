@@ -2324,7 +2324,7 @@ progress {
 }
 
 .reader-controls {
-  grid-template-columns: minmax(150px, 210px) minmax(190px, 260px) minmax(260px, 1fr) minmax(170px, auto);
+  grid-template-columns: minmax(130px, 190px) minmax(130px, 190px) minmax(180px, 260px) minmax(250px, 1fr) minmax(170px, auto);
   align-items: stretch;
 }
 
@@ -2335,6 +2335,7 @@ progress {
 }
 
 .reader-theme-control label,
+.reader-font-size-control label,
 .reader-chapter-control label {
   min-width: 0;
   text-transform: none;
@@ -2760,6 +2761,7 @@ progress {
 .reader-text-page {
   padding: 28px clamp(20px, 4vw, 54px);
   color: #22221f;
+  font-size: var(--reader-font-size, 18px);
   line-height: 1.75;
 }
 
@@ -3530,6 +3532,11 @@ progress {
   padding: 18px;
   border: 1px solid var(--app-line);
   border-radius: 8px;
+}
+
+.settings-reader-preview h4,
+.settings-reader-preview p {
+  font-size: var(--reader-font-size, 18px);
 }
 
 .settings-layout .reader-preview-card {

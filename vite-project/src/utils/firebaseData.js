@@ -22,6 +22,7 @@ export const userDataDefaults = {
   accountSettings: {},
   websiteTheme: 'paper',
   readerTheme: 'sepia',
+  readerFontSize: 18,
 }
 
 const globalDataRef = doc(db, 'bookwormData', 'global')

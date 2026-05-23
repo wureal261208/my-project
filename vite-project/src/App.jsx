@@ -118,6 +118,7 @@ function App() {
   const [query, setQuery] = useState('')
   const [topic, setTopic] = useState('all')
   const [readerTheme, setReaderTheme] = useState(userDataDefaults.readerTheme)
+  const [readerFontSize, setReaderFontSize] = useState(userDataDefaults.readerFontSize)
   const [websiteTheme, setWebsiteTheme] = useState(userDataDefaults.websiteTheme)
   const [authForm, setAuthForm] = useState(emptyAuthForm)
   const [adminBook, setAdminBook] = useState(emptyAdminBook)
@@ -186,6 +187,7 @@ function App() {
       accountSettings,
       websiteTheme,
       readerTheme,
+      readerFontSize,
     }),
     [
       accountSettings,
@@ -195,6 +197,7 @@ function App() {
       history,
       notes,
       progress,
+      readerFontSize,
       readerTheme,
       readingActivity,
       searchHistory,
@@ -276,6 +279,7 @@ function App() {
         setAccountSettings(userDataDefaults.accountSettings)
         setWebsiteTheme(userDataDefaults.websiteTheme)
         setReaderTheme(userDataDefaults.readerTheme)
+        setReaderFontSize(userDataDefaults.readerFontSize)
         setUserDataReady(false)
         userDataSnapshotRef.current = ''
       })
@@ -303,6 +307,7 @@ function App() {
           accountSettings: data.accountSettings || {},
           websiteTheme: data.websiteTheme || userDataDefaults.websiteTheme,
           readerTheme: data.readerTheme || userDataDefaults.readerTheme,
+          readerFontSize: data.readerFontSize || userDataDefaults.readerFontSize,
         }
         const pendingFavoriteUpdates = pendingFavoriteUpdatesRef.current
         const nextData = {
@@ -323,6 +328,7 @@ function App() {
         setAccountSettings(nextData.accountSettings)
         setWebsiteTheme(nextData.websiteTheme)
         setReaderTheme(nextData.readerTheme)
+        setReaderFontSize(nextData.readerFontSize)
         setUserDataReady(true)
       },
       (error) => {
@@ -834,10 +840,12 @@ function App() {
         onFavorite={toggleFavorite}
         onHome={() => navigateTo('home')}
         onLoginRequired={goAuth}
+        readerFontSize={readerFontSize}
         readerTheme={readerTheme}
         startPage={readerStartPage}
         setCheckpoints={setCheckpoints}
         setProgress={setProgress}
+        setReaderFontSize={setReaderFontSize}
         setReaderTheme={setReaderTheme}
       />
     ),
@@ -866,7 +874,9 @@ function App() {
         onResetPassword={resetAccountPassword}
         progress={progress}
         readingDays={readingActivity[getAccountKey(account)] || []}
+        readerFontSize={readerFontSize}
         readerTheme={readerTheme}
+        setReaderFontSize={setReaderFontSize}
         setReaderTheme={setReaderTheme}
         setWebsiteTheme={updateWebsiteTheme}
         viewCounts={viewCounts}
