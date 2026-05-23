@@ -94,30 +94,28 @@ function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme =
           })}
         </nav>
 
-        {!isAdminPage && (
-          <div className="header-account">
-            <button className="avatar-chip" onClick={() => (isGuest ? onAuth() : navigateTo('profile'))} type="button">
-              <span>
-                {account?.avatar ? <img src={account.avatar} alt="" /> : getInitials(displayName)}
-              </span>
-              <strong>{displayName}</strong>
-            </button>
-            {isGuest ? (
-              <>
-                <button className="ghost-button" onClick={onGuest} type="button">
-                  None account
-                </button>
-                <button className="primary-button" onClick={onAuth} type="button">
-                  Login
-                </button>
-              </>
-            ) : (
-              <button className="ghost-button" onClick={onLogout} type="button">
-                Logout
+        <div className="header-account">
+          <button className="avatar-chip" onClick={() => (isGuest ? onAuth() : navigateTo('profile'))} type="button">
+            <span>
+              {account?.avatar ? <img src={account.avatar} alt="" /> : getInitials(displayName)}
+            </span>
+            <strong>{displayName}</strong>
+          </button>
+          {isGuest ? (
+            <>
+              <button className="ghost-button" onClick={onGuest} type="button">
+                None account
               </button>
-            )}
-          </div>
-        )}
+              <button className="primary-button" onClick={onAuth} type="button">
+                Login
+              </button>
+            </>
+          ) : (
+            <button className="ghost-button" onClick={onLogout} type="button">
+              Logout
+            </button>
+          )}
+        </div>
       </header>
 
       <main className="page-shell">{children}</main>

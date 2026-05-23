@@ -38,7 +38,6 @@ function ReaderPage({
   const [readerMessage, setReaderMessage] = useState('')
   const [pendingChapterIndex, setPendingChapterIndex] = useState(null)
   const [showMemberPrompt, setShowMemberPrompt] = useState(false)
-  const [commentSort, setCommentSort] = useState('newest')
   const activeBook = useMemo(() => book || { id: 'empty', title: '', formats: {} }, [book])
   const readerUrl = getReaderUrl(activeBook)
   const readerTextUrl = getReaderTextUrl(activeBook)
@@ -67,12 +66,7 @@ function ReaderPage({
   const currentReaderText = readerPages[currentPage - 1] || ''
   const currentReaderParagraphs = useMemo(() => getDisplayParagraphs(currentReaderText), [currentReaderText])
   const chapterStrip = useMemo(() => getChapterStrip(chapters, currentChapterIndex), [chapters, currentChapterIndex])
-  const sortedComments = [...comments].sort((first, second) => {
-    const firstTime = new Date(first.createdAt).getTime()
-    const secondTime = new Date(second.createdAt).getTime()
-
-    return commentSort === 'newest' ? secondTime - firstTime : firstTime - secondTime
-  })
+  const latestComments = getLatestComments(comments).slice(0, 3)
 
   const saveCheckpoint = useCallback(
     (page = currentPage) => {
@@ -313,12 +307,11 @@ function ReaderPage({
         />
         <ReaderCommentsPanel
           account={account}
-          commentSort={commentSort}
           commentText={commentText}
-          comments={sortedComments}
-          onCommentSort={setCommentSort}
+          comments={latestComments}
           onCommentText={setCommentText}
           onSubmitComment={submitReaderComment}
+          totalComments={comments.length}
         />
       </div>
       {pendingChapterIndex !== null && (
@@ -359,17 +352,21 @@ function getReaderTextUrl(book) {
 }
 
 function getChapterStrip(chapters, currentIndex) {
-  return [
-    { id: 'previous-chapter', index: currentIndex - 1, position: 'Previous' },
-    { id: 'current-chapter', index: currentIndex, position: 'Current' },
-    { id: 'next-chapter', index: currentIndex + 1, position: 'Next' },
-  ]
-    .filter((item) => item.index >= 0 && item.index < chapters.length)
-    .map((item) => ({
-      ...item,
-      chapter: chapters[item.index],
-      id: `${item.id}-${chapters[item.index].id}`,
-    }))
+  return chapters.map((chapter, index) => ({
+    id: `reader-chapter-strip-${chapter.id || index}`,
+    index,
+    position: index === currentIndex ? 'Current' : `Chapter ${chapter.number || index + 1}`,
+    chapter,
+  }))
+}
+
+function getLatestComments(comments = []) {
+  return [...comments].sort((first, second) => {
+    const firstTime = new Date(first.createdAt).getTime()
+    const secondTime = new Date(second.createdAt).getTime()
+
+    return secondTime - firstTime
+  })
 }
 
 function getFormatUrl(formats, mimePrefix) {

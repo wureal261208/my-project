@@ -1,12 +1,10 @@
-const COMMENT_PREVIEW_LIMIT = 5
+const COMMENT_PREVIEW_LIMIT = 3
 
 function DetailComments({
   account,
-  commentSort,
   commentText,
   comments,
   hasMoreComments,
-  onCommentSort,
   onCommentText,
   onSubmitComment,
   onToggleComments,
@@ -21,14 +19,6 @@ function DetailComments({
           <h2>Comments</h2>
         </div>
         <span>{comments.length} comments</span>
-      </div>
-      <div className="comment-sort" aria-label="Sort comments">
-        <button className={commentSort === 'newest' ? 'active' : ''} onClick={() => onCommentSort('newest')} type="button">
-          Newest
-        </button>
-        <button className={commentSort === 'oldest' ? 'active' : ''} onClick={() => onCommentSort('oldest')} type="button">
-          Oldest
-        </button>
       </div>
       <form
         className="comment-form"
