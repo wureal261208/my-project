@@ -1,17 +1,11 @@
-import ReaderChapterStrip from './ReaderChapterStrip'
-
 function ReaderFrame({
   activeBook,
   chapterPage,
-  chapterStrip,
   currentChapter,
-  currentChapterIndex,
   currentPage,
   currentReaderParagraphs,
   guestChapterLimit,
   hasReachedGuestLimit,
-  isGuest,
-  onChapter,
   onLoginRequired,
   onMovePage,
   readerMessage,
@@ -57,13 +51,6 @@ function ReaderFrame({
       ) : (
         <p>This book does not include a readable text link.</p>
       )}
-      <ReaderChapterStrip
-        chapters={chapterStrip}
-        currentChapterIndex={currentChapterIndex}
-        guestChapterLimit={guestChapterLimit}
-        isGuest={isGuest}
-        onChapter={onChapter}
-      />
       {hasReachedGuestLimit && (
         <div className="reader-lock">
           <div>

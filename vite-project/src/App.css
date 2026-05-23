@@ -2245,6 +2245,7 @@ progress {
 
 .reader-focus .reader-topbar,
 .reader-focus .reader-controls,
+.reader-focus .chapter-panel,
 .reader-focus .reader-comments-panel,
 .reader-focus .reader-frame {
   box-shadow: none;
@@ -2252,6 +2253,7 @@ progress {
 
 .reader-night .reader-topbar,
 .reader-night .reader-controls,
+.reader-night .chapter-panel,
 .reader-night .reader-comments-panel,
 .reader-night .reader-frame {
   border-color: #303030;
@@ -2294,7 +2296,7 @@ progress {
 }
 
 .reader-navbar {
-  grid-template-columns: auto minmax(300px, 0.8fr) minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(350px, 470px) minmax(0, 1fr) auto;
 }
 
 .reader-brand-button {
@@ -2307,16 +2309,22 @@ progress {
 
 .reader-nav {
   justify-content: flex-start;
+  width: 100%;
   min-width: 0;
   overflow-x: auto;
 }
 
+.reader-topbar > .ghost-button {
+  justify-self: end;
+}
+
 .reader-topbar h1 {
   font-size: clamp(20px, 3vw, 34px);
+  line-height: 1.05;
 }
 
 .reader-controls {
-  grid-template-columns: minmax(160px, 220px) minmax(280px, 1fr) minmax(170px, auto);
+  grid-template-columns: minmax(150px, 210px) minmax(190px, 260px) minmax(260px, 1fr) minmax(170px, auto);
   align-items: stretch;
 }
 
@@ -2326,7 +2334,8 @@ progress {
   min-width: 0;
 }
 
-.reader-theme-control label {
+.reader-theme-control label,
+.reader-chapter-control label {
   min-width: 0;
   text-transform: none;
 }
@@ -2353,7 +2362,7 @@ progress {
 
 .reader-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(280px, 330px);
   gap: 12px;
   min-height: 0;
 }
@@ -2469,6 +2478,12 @@ progress {
   display: grid;
   align-content: start;
   gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #d8d8d3;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
 }
 
 .chapter-panel h2,
@@ -2724,7 +2739,7 @@ progress {
 .reader-page .reader-frame {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   height: 100%;
   overflow: hidden;

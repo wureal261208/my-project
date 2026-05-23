@@ -8,6 +8,10 @@ function ReaderTopbar({ activeBook, favorites, onBack, onDiscover, onFavorite, o
         <span>BookWorm</span>
       </button>
       <nav className="main-nav reader-nav" aria-label="Reader navigation">
+        <button className="active" onClick={onBack} type="button">
+          <i className="bi bi-arrow-left" />
+          Back to detail
+        </button>
         <button onClick={onHome} type="button">
           <i className="bi bi-house" />
           Home
@@ -15,10 +19,6 @@ function ReaderTopbar({ activeBook, favorites, onBack, onDiscover, onFavorite, o
         <button onClick={onDiscover} type="button">
           <i className="bi bi-compass" />
           Discover
-        </button>
-        <button className="active" onClick={onBack} type="button">
-          <i className="bi bi-arrow-left" />
-          Back to detail
         </button>
       </nav>
       <div className="reader-title-block">

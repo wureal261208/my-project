@@ -1,10 +1,13 @@
 function ReaderControls({
   chapterPage,
   chapterProgressValue,
+  chapters,
   currentChapter,
+  currentChapterIndex,
   guestChapterLimit,
   isFinished,
   isGuest,
+  onChapter,
   onMarkChapterDone,
   onReaderTheme,
   progressValue,
@@ -19,6 +22,19 @@ function ReaderControls({
             <option value="sepia">Sepia</option>
             <option value="focus">Focus</option>
             <option value="night">Night</option>
+          </select>
+        </label>
+      </div>
+      <div className="reader-control-card reader-chapter-control">
+        <label>
+          Chapter
+          <select value={currentChapterIndex} onChange={(event) => onChapter(Number(event.target.value))}>
+            {chapters.map((chapter, index) => (
+              <option key={chapter.id || `${chapter.title}-${index}`} value={index}>
+                {chapter.title || chapter.label}
+                {isGuest && index + 1 > guestChapterLimit ? ' (locked)' : ''}
+              </option>
+            ))}
           </select>
         </label>
       </div>

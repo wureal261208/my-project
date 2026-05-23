@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import ReaderChapterPanel from '../reader/ReaderChapterPanel'
 import ReaderCommentsPanel from '../reader/ReaderCommentsPanel'
 import ReaderControls from '../reader/ReaderControls'
 import ReaderFrame from '../reader/ReaderFrame'
@@ -65,7 +66,6 @@ function ReaderPage({
   const chapterProgressValue = Math.round((chapterPage / currentChapter.pages) * 100)
   const currentReaderText = readerPages[currentPage - 1] || ''
   const currentReaderParagraphs = useMemo(() => getDisplayParagraphs(currentReaderText), [currentReaderText])
-  const chapterStrip = useMemo(() => getChapterStrip(chapters, currentChapterIndex), [chapters, currentChapterIndex])
   const latestComments = getLatestComments(comments).slice(0, 3)
 
   const saveCheckpoint = useCallback(
@@ -215,6 +215,19 @@ function ReaderPage({
     setCurrentPage(chapter.startPage)
   }
 
+  function goToChapterPage(chapterIndex, pageInChapter) {
+    const chapter = chapters[chapterIndex]
+    if (!chapter) return
+
+    if (isGuest && chapterIndex + 1 > GUEST_CHAPTER_LIMIT) {
+      setShowMemberPrompt(true)
+      return
+    }
+
+    const safeChapterPage = Math.min(Math.max(Number(pageInChapter) || 1, 1), chapter.pages)
+    setCurrentPage(chapter.startPage + safeChapterPage - 1)
+  }
+
   function movePage(direction) {
     const nextChapterIndex = currentChapterIndex + 1
 
@@ -281,10 +294,13 @@ function ReaderPage({
       <ReaderControls
         chapterPage={chapterPage}
         chapterProgressValue={chapterProgressValue}
+        chapters={chapters}
         currentChapter={currentChapter}
+        currentChapterIndex={currentChapterIndex}
         guestChapterLimit={GUEST_CHAPTER_LIMIT}
         isFinished={isFinished}
         isGuest={isGuest}
+        onChapter={goToChapter}
         onMarkChapterDone={markChapterDone}
         onReaderTheme={setReaderTheme}
         progressValue={progressValue}
@@ -292,18 +308,24 @@ function ReaderPage({
       />
 
       <div className="reader-main">
+        <ReaderChapterPanel
+          chapters={chapters}
+          currentChapterIndex={currentChapterIndex}
+          currentPage={currentPage}
+          guestChapterLimit={GUEST_CHAPTER_LIMIT}
+          isGuest={isGuest}
+          key={currentChapterIndex}
+          onChapter={goToChapter}
+          onChapterPage={goToChapterPage}
+        />
         <ReaderFrame
           activeBook={activeBook}
           chapterPage={chapterPage}
-          chapterStrip={chapterStrip}
           currentChapter={currentChapter}
-          currentChapterIndex={currentChapterIndex}
           currentPage={currentPage}
           currentReaderParagraphs={currentReaderParagraphs}
           guestChapterLimit={GUEST_CHAPTER_LIMIT}
           hasReachedGuestLimit={hasReachedGuestLimit}
-          isGuest={isGuest}
-          onChapter={goToChapter}
           onLoginRequired={onLoginRequired}
           onMovePage={movePage}
           readerMessage={readerMessage}
@@ -355,15 +377,6 @@ function getReaderTextUrl(book) {
     book.readerUrl ||
     ''
   )
-}
-
-function getChapterStrip(chapters, currentIndex) {
-  return chapters.map((chapter, index) => ({
-    id: `reader-chapter-strip-${chapter.id || index}`,
-    index,
-    position: index === currentIndex ? 'Current' : `Chapter ${chapter.number || index + 1}`,
-    chapter,
-  }))
 }
 
 function getLatestComments(comments = []) {
