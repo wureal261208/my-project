@@ -1,8 +1,8 @@
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { deleteField, doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export const globalDataDefaults = {
-  localBooks: [],
+  managedBooks: [],
   viewCounts: {},
   bookReaders: {},
   comments: {},
@@ -33,7 +33,17 @@ function userDataRef(userId) {
 export function subscribeGlobalData(onData, onError) {
   return onSnapshot(
     globalDataRef,
-    (snapshot) => onData({ ...globalDataDefaults, ...(snapshot.data() || {}) }),
+    (snapshot) => {
+      const data = snapshot.data() || {}
+      const hasManagedBooks = Array.isArray(data.managedBooks)
+      const hasLegacyBooks = Object.hasOwn(data, 'localBooks')
+      onData({
+        ...globalDataDefaults,
+        ...data,
+        managedBooks: hasManagedBooks ? data.managedBooks : data.localBooks || [],
+        needsManagedBooksCleanup: hasLegacyBooks,
+      })
+    },
     onError,
   )
 }
@@ -47,7 +57,7 @@ export function subscribeUserData(userId, onData, onError) {
 }
 
 export function saveGlobalData(data) {
-  return setDoc(globalDataRef, withTimestamp(cleanForFirestore(data)), { merge: true })
+  return setDoc(globalDataRef, withTimestamp({ ...cleanForFirestore(data), localBooks: deleteField() }), { merge: true })
 }
 
 export function saveUserData(userId, data) {

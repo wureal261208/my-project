@@ -1,6 +1,6 @@
-import { initializeApp } from 'firebase/app'
+import { getApp, getApps, initializeApp } from 'firebase/app'
 import { getAnalytics, isSupported } from 'firebase/analytics'
-import { getAuth } from 'firebase/auth'
+import { getAuth, initializeAuth, inMemoryPersistence, setPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const env = import.meta.env
@@ -15,8 +15,19 @@ const firebaseConfig = {
   measurementId: env.VITE_FIREBASE_MEASUREMENT_ID || 'G-152LMCWSBR',
 }
 
-export const app = initializeApp(firebaseConfig)
-export const auth = getAuth(app)
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
+
+function createAuth() {
+  try {
+    return initializeAuth(app, { persistence: inMemoryPersistence })
+  } catch {
+    const existingAuth = getAuth(app)
+    setPersistence(existingAuth, inMemoryPersistence).catch(() => {})
+    return existingAuth
+  }
+}
+
+export const auth = createAuth()
 export const db = getFirestore(app)
 
 isSupported().then((supported) => {

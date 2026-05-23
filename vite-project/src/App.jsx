@@ -96,7 +96,7 @@ function App() {
   const routeTimerRef = useRef(null)
   const [books, setBooks] = useState(fallbackBooks)
   const [, setBooksLoading] = useState(false)
-  const [localBooks, setLocalBooks] = useState(globalDataDefaults.localBooks)
+  const [managedBooks, setManagedBooks] = useState(globalDataDefaults.managedBooks)
   const [favorites, setFavorites] = useState(userDataDefaults.favorites)
   const [history, setHistory] = useState(userDataDefaults.history)
   const [readingActivity, setReadingActivity] = useState(userDataDefaults.readingActivity)
@@ -171,14 +171,14 @@ function App() {
 
   const globalData = useMemo(
     () => ({
-      localBooks,
+      managedBooks,
       viewCounts,
       bookReaders,
       comments,
       staff,
       knownUsers,
     }),
-    [bookReaders, comments, knownUsers, localBooks, staff, viewCounts],
+    [bookReaders, comments, knownUsers, managedBooks, staff, viewCounts],
   )
 
   const userData = useMemo(
@@ -230,7 +230,7 @@ function App() {
     return subscribeGlobalData(
       (data) => {
         const nextData = {
-          localBooks: data.localBooks || [],
+          managedBooks: data.managedBooks || [],
           viewCounts: data.viewCounts || {},
           bookReaders: data.bookReaders || {},
           comments: data.comments || {},
@@ -238,8 +238,8 @@ function App() {
           knownUsers: data.knownUsers || [],
         }
 
-        globalDataSnapshotRef.current = stableStringify(nextData)
-        setLocalBooks(nextData.localBooks)
+        globalDataSnapshotRef.current = data.needsManagedBooksCleanup ? '' : stableStringify(nextData)
+        setManagedBooks(nextData.managedBooks)
         setViewCounts(nextData.viewCounts)
         setBookReaders(nextData.bookReaders)
         setComments(nextData.comments)
@@ -449,11 +449,11 @@ function App() {
     saveUserData(account.id, userData).catch(handleDataSyncError)
   }, [account.id, account.role, handleDataSyncError, userData, userDataReady])
 
-  const publishedLocalBooks = useMemo(
-    () => localBooks.filter((book) => (book.status || 'published') === 'published'),
-    [localBooks],
+  const publishedManagedBooks = useMemo(
+    () => managedBooks.filter((book) => (book.status || 'published') === 'published'),
+    [managedBooks],
   )
-  const allBooks = useMemo(() => [...publishedLocalBooks, ...books], [books, publishedLocalBooks])
+  const allBooks = useMemo(() => [...publishedManagedBooks, ...books], [books, publishedManagedBooks])
   const topics = useMemo(() => ['all', ...new Set(allBooks.map(getCategory).slice(0, 12))], [allBooks])
   const filteredBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -681,13 +681,13 @@ function App() {
     setFavorites((current) => applyFavoriteUpdates(current, [{ action, bookId }]))
   }
 
-  function addLocalBook(event) {
+  function addManagedBook(event) {
     event.preventDefault()
     if (!adminBook.title.trim()) return
 
     const nextBook = createAdminBookRecord(adminBook)
 
-    setLocalBooks((current) => {
+    setManagedBooks((current) => {
       const exists = current.some((book) => book.id === nextBook.id)
       if (exists) return current.map((book) => (book.id === nextBook.id ? nextBook : book))
 
@@ -697,7 +697,7 @@ function App() {
     setToast({ type: 'success', message: nextBook.status === 'published' ? 'Book published to the main site.' : 'Book saved in Admin.' })
   }
 
-  function editLocalBook(book) {
+  function editManagedBook(book) {
     setAdminBook({
       ...emptyAdminBook,
       ...book,
@@ -856,12 +856,12 @@ function App() {
     ),
     admin: account.role === 'admin' ? (
       <AdminPage
-        addLocalBook={addLocalBook}
+        addManagedBook={addManagedBook}
         adminBook={adminBook}
         books={allBooks}
-        localBooks={localBooks}
-        removeLocalBook={(id) => setLocalBooks((current) => current.filter((book) => book.id !== id))}
-        editLocalBook={editLocalBook}
+        managedBooks={managedBooks}
+        removeManagedBook={(id) => setManagedBooks((current) => current.filter((book) => book.id !== id))}
+        editManagedBook={editManagedBook}
         resetAdminBook={() => setAdminBook(emptyAdminBook)}
         setAdminBook={setAdminBook}
         setStaff={setStaff}
@@ -946,7 +946,7 @@ function createAdminBookRecord(adminBook) {
 
   return {
     ...adminBook,
-    id: adminBook.id || `local-${Date.now()}`,
+    id: adminBook.id || `managed-${Date.now()}`,
     title: adminBook.title.trim(),
     author,
     category,

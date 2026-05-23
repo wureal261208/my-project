@@ -22,21 +22,33 @@ function gutenbergReaderTextPlugin() {
           return
         }
 
-        const sourcePath =
+        const sourcePaths =
           sourceType === 'plain'
-            ? `/cache/epub/${gutenbergId}/pg${gutenbergId}.txt`
-            : `/files/${gutenbergId}/${fileName}`
+            ? [
+                `/cache/epub/${gutenbergId}/pg${gutenbergId}.txt`,
+                `/cache/epub/${gutenbergId}/pg${gutenbergId}-0.txt`,
+                `/files/${gutenbergId}/${gutenbergId}-0.txt`,
+                `/files/${gutenbergId}/${gutenbergId}.txt`,
+                `/files/${gutenbergId}/${gutenbergId}-8.txt`,
+              ]
+            : [`/files/${gutenbergId}/${fileName}`]
 
         try {
-          const sourceResponse = await fetch(`https://www.gutenberg.org${sourcePath}`)
-          if (!sourceResponse.ok) {
-            response.statusCode = sourceResponse.status
-            response.end(`Reader source returned ${sourceResponse.status}`)
+          let lastStatus = 404
+
+          for (const sourcePath of sourcePaths) {
+            const sourceResponse = await fetch(`https://www.gutenberg.org${sourcePath}`)
+            lastStatus = sourceResponse.status
+
+            if (!sourceResponse.ok) continue
+
+            response.setHeader('content-type', sourceResponse.headers.get('content-type') || 'text/plain; charset=utf-8')
+            response.end(await sourceResponse.text())
             return
           }
 
-          response.setHeader('content-type', sourceResponse.headers.get('content-type') || 'text/plain; charset=utf-8')
-          response.end(await sourceResponse.text())
+          response.statusCode = lastStatus
+          response.end(`Reader source returned ${lastStatus}`)
         } catch {
           response.statusCode = 502
           response.end('Could not load reader text source.')

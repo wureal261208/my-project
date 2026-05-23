@@ -5,7 +5,7 @@ BookWorm is a React reading web app for browsing public-domain books, reading by
 ## Current Status
 
 - Data is stored in Firebase Firestore, not browser storage.
-- Firebase Authentication handles login, signup, logout, password reset, and session restore.
+- Firebase Authentication handles login, signup, logout, and password reset with in-memory auth state instead of browser storage.
 - React state controls the current page, selected book, reader settings, forms, and all UI updates.
 - Guest users can browse and preview limited chapters.
 - Logged-in users can keep private reading progress, favorites, notes, highlights, checkpoints, and reader theme.
@@ -61,7 +61,7 @@ Guest
 
 ```text
 bookwormData/global
-  localBooks
+  managedBooks
   viewCounts
   bookReaders
   comments

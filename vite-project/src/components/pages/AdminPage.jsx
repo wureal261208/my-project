@@ -27,12 +27,12 @@ const adminBookFilters = [
 ]
 
 function AdminPage({
-  addLocalBook,
+  addManagedBook,
   adminBook,
   books,
-  editLocalBook,
-  localBooks,
-  removeLocalBook,
+  editManagedBook,
+  managedBooks,
+  removeManagedBook,
   resetAdminBook,
   setAdminBook,
   setStaff,
@@ -42,12 +42,12 @@ function AdminPage({
   const [activeAdminSection, setActiveAdminSection] = useState('book')
   const [bookFilter, setBookFilter] = useState('all')
   const [showPreview, setShowPreview] = useState(false)
-  const publishedBooks = localBooks.filter((book) => (book.status || 'published') === 'published').length
-  const detailReadyBooks = localBooks.filter((book) => !getBookWarnings(book).some((warning) => warning.id === 'description')).length
-  const readerReadyBooks = localBooks.filter((book) => isReaderReady(book)).length
+  const publishedBooks = managedBooks.filter((book) => (book.status || 'published') === 'published').length
+  const detailReadyBooks = managedBooks.filter((book) => !getBookWarnings(book).some((warning) => warning.id === 'description')).length
+  const readerReadyBooks = managedBooks.filter((book) => isReaderReady(book)).length
   const currentWarnings = getFormWarnings(adminBook)
   const previewBook = useMemo(() => createPreviewBook(adminBook), [adminBook])
-  const filteredLocalBooks = localBooks.filter((book) => {
+  const filteredManagedBooks = managedBooks.filter((book) => {
     if (bookFilter === 'reader-ready') return isReaderReady(book)
     if (bookFilter === 'missing-cover') return !hasCover(book)
     if (bookFilter === 'missing-chapters') return !hasChapters(book)
@@ -155,7 +155,7 @@ function AdminPage({
             )}
           </div>
 
-          <form className="admin-form admin-book-form" onSubmit={addLocalBook}>
+          <form className="admin-form admin-book-form" onSubmit={addManagedBook}>
             <fieldset>
               <legend>Detail information</legend>
               {identityFields.map((field) => (
@@ -305,8 +305,8 @@ function AdminPage({
           <div className="admin-two-col">
             <section className="admin-table">
               <h2>Managed books</h2>
-              {filteredLocalBooks.length ? (
-                filteredLocalBooks.map((book) => {
+              {filteredManagedBooks.length ? (
+                filteredManagedBooks.map((book) => {
                   const totalPages = getTotalPages(book)
                   const chapters = getBookChapters(book, totalPages)
                   const warnings = getBookWarnings(book)
@@ -321,8 +321,8 @@ function AdminPage({
                       <small>{getAuthor(book)} - {getCategory(book)} - {chapters.length} chapters</small>
                       <div className="admin-row-actions">
                         {warnings.length > 0 && <strong>{warnings.length} warnings</strong>}
-                        <button className="ghost-button" onClick={() => editLocalBook(book)} type="button">Edit</button>
-                        <button className="ghost-button" onClick={() => removeLocalBook(book.id)} type="button">Remove</button>
+                        <button className="ghost-button" onClick={() => editManagedBook(book)} type="button">Edit</button>
+                        <button className="ghost-button" onClick={() => removeManagedBook(book.id)} type="button">Remove</button>
                       </div>
                     </div>
                   )

@@ -11,6 +11,7 @@ const GUEST_CHAPTER_LIMIT = 3
 const READER_PAGE_TARGET_LENGTH = 1800
 const MAX_GENERATED_READER_PAGES = 260
 const MAX_DETECTED_CHAPTER_NUMBER = 250
+const DEFAULT_READER_CHAPTERS = 12
 
 function ReaderPage({
   account,
@@ -43,13 +44,13 @@ function ReaderPage({
   const readerTextUrl = getReaderTextUrl(activeBook)
   const metadataTotalPages = useMemo(() => getTotalPages(activeBook), [activeBook])
   const metadataChapters = useMemo(() => getBookChapters(activeBook, metadataTotalPages), [activeBook, metadataTotalPages])
-  const contentChapters = useMemo(
-    () => getContentChapters(activeBook, readerText, metadataTotalPages),
-    [activeBook, readerText, metadataTotalPages],
+  const readerModel = useMemo(
+    () => buildReaderModel(activeBook, readerText, metadataChapters, metadataTotalPages),
+    [activeBook, metadataChapters, metadataTotalPages, readerText],
   )
-  const chapters = contentChapters.length > 1 ? contentChapters : metadataChapters
-  const totalPages = useMemo(() => getChapterPageTotal(chapters) || metadataTotalPages, [chapters, metadataTotalPages])
-  const readerPages = useMemo(() => buildReaderPages(readerText, chapters, totalPages), [chapters, readerText, totalPages])
+  const chapters = readerModel.chapters
+  const totalPages = readerModel.totalPages
+  const readerPages = readerModel.pages
   const checkpointKey = useMemo(() => getCheckpointKey(account, activeBook), [account, activeBook])
   const isGuest = account?.role === 'guest'
   const savedCheckpoint = isGuest ? null : checkpoints[checkpointKey]
@@ -75,7 +76,7 @@ function ReaderPage({
 
   const saveCheckpoint = useCallback(
     (page = currentPage) => {
-      if (!book || !canPersistReaderState || isGuest) return
+      if (!book || readerStatus !== 'ready' || !canPersistReaderState || isGuest) return
 
       const safePage = clampPage(page, totalPages)
       const chapterIndex = getChapterIndex(safePage, chapters)
@@ -93,7 +94,7 @@ function ReaderPage({
       }))
       setProgress((current) => ({ ...current, [activeBook.id]: Math.min(100, Math.round((safePage / totalPages) * 100)) }))
     },
-    [activeBook.id, book, canPersistReaderState, chapters, checkpointKey, currentPage, isGuest, setCheckpoints, setProgress, totalPages],
+    [activeBook.id, book, canPersistReaderState, chapters, checkpointKey, currentPage, isGuest, readerStatus, setCheckpoints, setProgress, totalPages],
   )
 
   useEffect(() => {
@@ -422,6 +423,124 @@ function getFetchableReaderUrl(url) {
   return url
 }
 
+function buildReaderModel(book, text, metadataChapters, metadataTotalPages) {
+  const contentChapters = metadataChapters.filter((chapter) => chapter.content?.trim())
+
+  if (contentChapters.length) {
+    return buildChapterContentModel(book, contentChapters, metadataTotalPages)
+  }
+
+  if (!text) {
+    return buildMissingReaderModel(book, metadataChapters)
+  }
+
+  const detectedChapters = splitTextByChapterHeadings(text)
+  if (detectedChapters.length >= 2) {
+    const contentTotalPages = estimateContentPageCount(text, metadataTotalPages, detectedChapters.length)
+    const chapterSections =
+      detectedChapters.length > contentTotalPages ? groupChapterSections(detectedChapters, contentTotalPages) : detectedChapters
+    const pageCounts = distributePagesByContent(chapterSections, contentTotalPages)
+
+    return buildChapterContentModel(book, chapterSections.map((chapter, index) => ({
+      ...chapter,
+      pages: pageCounts[index] || 1,
+    })), contentTotalPages)
+  }
+
+  const estimatedPages = estimateContentPageCount(text, metadataTotalPages, Math.max(1, metadataChapters.length))
+  const pages = splitTextIntoPages(text, estimatedPages, { allowFewerPages: true })
+  const chapters = fitChaptersToPageCount(book, metadataChapters, pages.length)
+
+  return normalizeReaderModel(book, chapters, pages)
+}
+
+function buildChapterContentModel(book, sourceChapters, fallbackPages) {
+  const pages = []
+  const chapters = []
+  let startPage = 1
+
+  sourceChapters.forEach((chapter, index) => {
+    const chapterPages = splitTextIntoPages(cleanBookText(chapter.content || ''), chapter.pages || 1, { allowFewerPages: true })
+    if (!chapterPages.length) return
+
+    const number = chapter.number || index + 1
+    const title = chapter.title || chapter.label || `Chapter ${number}`
+    chapters.push({
+      ...chapter,
+      id: chapter.id || `${book.id || 'book'}-reader-chapter-${index + 1}`,
+      label: chapter.label || `Chapter ${number}`,
+      number,
+      title,
+      startPage,
+      pages: chapterPages.length,
+    })
+    pages.push(...chapterPages)
+    startPage += chapterPages.length
+  })
+
+  return normalizeReaderModel(book, chapters, pages, fallbackPages)
+}
+
+function fitChaptersToPageCount(book, sourceChapters, pageCount) {
+  const safePageCount = Math.max(1, pageCount)
+  const chapterCount = Math.max(1, Math.min(sourceChapters.length || DEFAULT_READER_CHAPTERS, safePageCount))
+  const basePages = Math.floor(safePageCount / chapterCount)
+  const extraPages = safePageCount % chapterCount
+  let startPage = 1
+
+  return Array.from({ length: chapterCount }, (_, index) => {
+    const sourceChapter = sourceChapters[index] || {}
+    const pages = basePages + (index < extraPages ? 1 : 0)
+    const number = sourceChapter.number || index + 1
+    const chapter = {
+      ...sourceChapter,
+      id: sourceChapter.id || `${book.id || 'book'}-reader-chapter-${index + 1}`,
+      label: sourceChapter.label || `Chapter ${number}`,
+      number,
+      title: sourceChapter.title || sourceChapter.label || `Chapter ${number}`,
+      startPage,
+      pages,
+    }
+
+    startPage += pages
+    return chapter
+  })
+}
+
+function normalizeReaderModel(book, chapters, pages, fallbackPages = 1) {
+  const cleanPages = pages.map((page) => page.trim()).filter(Boolean)
+
+  if (!cleanPages.length) {
+    return buildMissingReaderModel(book, chapters.length ? chapters : getBookChapters(book, fallbackPages))
+  }
+
+  const normalizedChapters = chapters.length ? chapters : fitChaptersToPageCount(book, [], cleanPages.length)
+  return {
+    chapters: normalizedChapters,
+    pages: cleanPages,
+    totalPages: cleanPages.length,
+  }
+}
+
+function buildMissingReaderModel(book, metadataChapters) {
+  const fallbackChapter = metadataChapters[0] || {
+    id: `${book.id || 'book'}-reader-unavailable`,
+    label: 'Chapter 1',
+    number: 1,
+    title: 'Chapter 1',
+  }
+
+  return {
+    chapters: [{
+      ...fallbackChapter,
+      startPage: 1,
+      pages: 1,
+    }],
+    pages: [''],
+    totalPages: 1,
+  }
+}
+
 function isHtmlReaderSource(url, response) {
   const contentType = response.headers.get('content-type') || ''
   return contentType.includes('text/html') || /\.html?($|\?)/i.test(url)
@@ -458,63 +577,6 @@ function cleanBookText(text) {
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim()
-}
-
-function buildReaderPages(text, chapters, totalPages) {
-  const chapterContent = chapters.some((chapter) => chapter.content)
-
-  if (chapterContent) {
-    return normalizePageCount(
-      chapters.flatMap((chapter) => splitTextIntoPages(cleanBookText(chapter.content || ''), chapter.pages)),
-      totalPages,
-    )
-  }
-
-  if (!text) return []
-
-  const chapterBodies = splitTextByChapterHeadings(text)
-
-  if (chapterBodies.length >= chapters.length) {
-    const groupedChapters = groupEntries(chapterBodies.map((chapter) => chapter.content), chapters.length)
-
-    return normalizePageCount(
-      chapters.flatMap((chapter, index) => splitTextIntoPages(groupedChapters[index] || '', chapter.pages)),
-      totalPages,
-    )
-  }
-
-  return splitTextIntoPages(text, totalPages)
-}
-
-function getContentChapters(book, text, totalPages) {
-  if (!text) return []
-
-  const detectedChapters = splitTextByChapterHeadings(text)
-  if (detectedChapters.length < 2) return []
-
-  const contentTotalPages = estimateContentPageCount(text, totalPages, detectedChapters.length)
-  const chapterSections =
-    detectedChapters.length > contentTotalPages ? groupChapterSections(detectedChapters, contentTotalPages) : detectedChapters
-  const pageCounts = distributePagesByContent(chapterSections, contentTotalPages)
-  let startPage = 1
-
-  return chapterSections.map((chapter, index) => {
-    const pages = pageCounts[index]
-    const number = chapter.number || index + 1
-    const label = chapter.label || `Chapter ${number}`
-    const normalizedChapter = {
-      id: `${book.id || 'book'}-content-chapter-${index + 1}`,
-      label,
-      number,
-      title: chapter.title || label,
-      startPage,
-      pages,
-      content: chapter.content,
-    }
-
-    startPage += pages
-    return normalizedChapter
-  })
 }
 
 function splitTextByChapterHeadings(text) {
@@ -735,10 +797,6 @@ function estimateContentPageCount(text, fallbackPages, chapterCount) {
   return Math.min(MAX_GENERATED_READER_PAGES, Math.max(minimumPages, preferredPages || fallbackPages))
 }
 
-function getChapterPageTotal(chapters) {
-  return chapters.reduce((total, chapter) => total + Math.max(0, chapter.pages || 0), 0)
-}
-
 function groupChapterSections(sections, targetCount) {
   return Array.from({ length: targetCount }, (_, index) => {
     const start = Math.floor((index * sections.length) / targetCount)
@@ -781,21 +839,10 @@ function distributePagesByContent(chapters, totalPages) {
   return weightedPages.map((chapter) => chapter.pages)
 }
 
-function groupEntries(entries, targetCount) {
-  const groups = Array.from({ length: targetCount }, () => [])
-
-  entries.forEach((entry, index) => {
-    const groupIndex = Math.min(targetCount - 1, Math.floor((index * targetCount) / entries.length))
-    groups[groupIndex].push(entry)
-  })
-
-  return groups.map((group) => group.join('\n\n'))
-}
-
-function splitTextIntoPages(text, pageCount) {
+function splitTextIntoPages(text, pageCount, options = {}) {
   const cleanText = text.replace(/\n{3,}/g, '\n\n').trim()
   const safePageCount = Math.max(1, pageCount)
-  if (!cleanText) return Array.from({ length: safePageCount }, () => '')
+  if (!cleanText) return options.allowFewerPages ? [] : Array.from({ length: safePageCount }, () => '')
 
   const targetLength = Math.max(360, Math.ceil(cleanText.length / safePageCount))
   const paragraphs = cleanText
@@ -820,7 +867,7 @@ function splitTextIntoPages(text, pageCount) {
 
   if (currentPageText || !pages.length) pages.push(currentPageText)
 
-  return normalizePageCount(pages, safePageCount)
+  return options.allowFewerPages ? compactPageCount(pages, safePageCount) : normalizePageCount(pages, safePageCount)
 }
 
 function splitLongParagraph(paragraph, targetLength) {
@@ -856,6 +903,16 @@ function normalizePageCount(pages, pageCount) {
 
   while (safePages.length < pageCount) {
     safePages.push('')
+  }
+
+  return safePages
+}
+
+function compactPageCount(pages, pageCount) {
+  const safePages = pages.map((page) => page.trim()).filter(Boolean).slice(0, pageCount)
+
+  if (pages.length > pageCount) {
+    safePages[pageCount - 1] = [safePages[pageCount - 1], ...pages.slice(pageCount)].filter(Boolean).join('\n\n')
   }
 
   return safePages
