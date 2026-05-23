@@ -402,27 +402,35 @@ function getFetchableReaderUrl(url) {
 
     if (parsedUrl.hostname.endsWith('gutenberg.org')) {
       const cacheTextMatch = parsedUrl.pathname.match(/^\/cache\/epub\/(\d+)\/pg\d+\.txt$/i)
-      if (cacheTextMatch) return `/api/reader-text/${cacheTextMatch[1]}/plain`
+      if (cacheTextMatch) return getReaderApiUrl(cacheTextMatch[1], 'plain')
 
       const cacheReaderMatch = parsedUrl.pathname.match(/^\/cache\/epub\/(\d+)\//i)
-      if (cacheReaderMatch) return `/api/reader-text/${cacheReaderMatch[1]}/plain`
+      if (cacheReaderMatch) return getReaderApiUrl(cacheReaderMatch[1], 'plain')
 
       const ebookTextMatch = parsedUrl.pathname.match(/^\/ebooks\/(\d+)\.txt/i)
-      if (ebookTextMatch) return `/api/reader-text/${ebookTextMatch[1]}/plain`
+      if (ebookTextMatch) return getReaderApiUrl(ebookTextMatch[1], 'plain')
 
       const ebookPageMatch = parsedUrl.pathname.match(/^\/ebooks\/(\d+)(?:\.html?)?$/i)
-      if (ebookPageMatch) return `/api/reader-text/${ebookPageMatch[1]}/plain`
+      if (ebookPageMatch) return getReaderApiUrl(ebookPageMatch[1], 'plain')
 
       const fileMatch = parsedUrl.pathname.match(/^\/files\/(\d+)\/([^/]+)$/i)
-      if (fileMatch) return `/api/reader-text/${fileMatch[1]}/file/${fileMatch[2]}`
+      if (fileMatch) return getReaderApiUrl(fileMatch[1], 'file', fileMatch[2])
 
-      return `/api/reader-text${parsedUrl.pathname}${parsedUrl.search}`
+      const idMatch = parsedUrl.pathname.match(/(\d+)/)
+      if (idMatch) return getReaderApiUrl(idMatch[1], 'plain')
     }
   } catch {
     return url
   }
 
   return url
+}
+
+function getReaderApiUrl(gutenbergId, sourceType, fileName = '') {
+  const query = new URLSearchParams({ id: String(gutenbergId), type: sourceType })
+  if (fileName) query.set('file', fileName)
+
+  return `/api/reader-text?${query.toString()}`
 }
 
 function buildReaderModel(book, text, metadataChapters, metadataTotalPages) {

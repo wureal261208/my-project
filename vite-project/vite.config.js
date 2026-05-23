@@ -12,10 +12,13 @@ function gutenbergReaderTextPlugin() {
     configureServer(server) {
       server.middlewares.use('/api/reader-text', async (request, response, next) => {
         const requestUrl = new URL(request.url || '/', 'http://127.0.0.1')
+        const queryId = requestUrl.searchParams.get('id')
+        const queryType = requestUrl.searchParams.get('type')
+        const queryFile = requestUrl.searchParams.get('file') || ''
         const parts = requestUrl.pathname.split('/').filter(Boolean)
-        const gutenbergId = parts[0]
-        const sourceType = parts[1]
-        const fileName = parts.slice(2).join('/')
+        const gutenbergId = queryId || parts[0]
+        const sourceType = queryType || parts[1]
+        const fileName = queryFile || parts.slice(2).join('/')
 
         if (!/^\d+$/.test(gutenbergId) || !sourceType) {
           next()

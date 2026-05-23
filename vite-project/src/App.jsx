@@ -23,10 +23,12 @@ import { auth } from './firebase'
 import { getAuthor, getCategory, getReaderUrl } from './utils/bookUtils'
 import {
   globalDataDefaults,
+  migrateLegacyComments,
   saveBookComment,
   saveGlobalData,
   saveUserData,
   stableStringify,
+  subscribeComments,
   subscribeGlobalData,
   subscribeUserData,
   userDataDefaults,
@@ -127,6 +129,7 @@ function App() {
   const userDataSnapshotRef = useRef('')
   const pendingFavoriteUpdatesRef = useRef([])
   const syncErrorRef = useRef('')
+  const migratedLegacyCommentsRef = useRef(false)
   const activePage = pageState.activePage
 
   const staffEmails = useMemo(() => staff.map((item) => item.email.toLowerCase()), [staff])
@@ -222,7 +225,6 @@ function App() {
           managedBooks: data.managedBooks || [],
           viewCounts: data.viewCounts || {},
           bookReaders: data.bookReaders || {},
-          comments: data.comments || {},
           staff: data.staff || [],
           knownUsers: data.knownUsers || [],
         }
@@ -231,7 +233,13 @@ function App() {
         setManagedBooks(nextData.managedBooks)
         setViewCounts(nextData.viewCounts)
         setBookReaders(nextData.bookReaders)
-        setComments(nextData.comments)
+        if (data.comments && Object.keys(data.comments).length) {
+          setComments((current) => mergeCommentMaps(data.comments, current))
+          if (!migratedLegacyCommentsRef.current) {
+            migratedLegacyCommentsRef.current = true
+            migrateLegacyComments(data.comments).catch(handleDataSyncError)
+          }
+        }
         setStaff(nextData.staff)
         setKnownUsers(nextData.knownUsers)
         setGlobalDataReady(true)
@@ -240,6 +248,15 @@ function App() {
         setGlobalDataReady(true)
         handleDataSyncError(error)
       },
+    )
+  }, [handleDataSyncError])
+
+  useEffect(() => {
+    return subscribeComments(
+      (nextComments) => {
+        setComments((current) => mergeCommentMaps(current, nextComments))
+      },
+      handleDataSyncError,
     )
   }, [handleDataSyncError])
 
@@ -901,6 +918,28 @@ function getAccountKey(account) {
 
 function getViewerCounts(bookReaders) {
   return Object.fromEntries(Object.entries(bookReaders).map(([bookId, readers]) => [bookId, readers.length]))
+}
+
+function mergeCommentMaps(...commentMaps) {
+  return commentMaps.reduce((result, commentMap = {}) => {
+    Object.entries(commentMap).forEach(([bookId, items]) => {
+      if (!Array.isArray(items)) return
+
+      const existingItems = result[bookId] || []
+      const mergedItems = [...existingItems]
+      const knownIds = new Set(existingItems.map((item) => item.id))
+
+      items.forEach((item) => {
+        if (!item?.id || knownIds.has(item.id)) return
+        knownIds.add(item.id)
+        mergedItems.push(item)
+      })
+
+      result[bookId] = mergedItems
+    })
+
+    return result
+  }, {})
 }
 
 function applyFavoriteUpdates(favorites = [], updates = []) {

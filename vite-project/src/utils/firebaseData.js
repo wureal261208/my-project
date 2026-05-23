@@ -1,4 +1,4 @@
-import { arrayUnion, deleteField, doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { arrayUnion, collection, deleteField, doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export const globalDataDefaults = {
@@ -25,9 +25,14 @@ export const userDataDefaults = {
 }
 
 const globalDataRef = doc(db, 'bookwormData', 'global')
+const commentsCollectionRef = collection(db, 'bookwormComments')
 
 function userDataRef(userId) {
   return doc(db, 'bookwormUsers', userId)
+}
+
+function bookCommentsRef(bookId) {
+  return doc(db, 'bookwormComments', String(bookId))
 }
 
 export function subscribeGlobalData(onData, onError) {
@@ -60,16 +65,45 @@ export function saveGlobalData(data) {
   return setDoc(globalDataRef, withTimestamp({ ...cleanForFirestore(data), localBooks: deleteField() }), { merge: true })
 }
 
+export function subscribeComments(onData, onError) {
+  return onSnapshot(
+    commentsCollectionRef,
+    (snapshot) => {
+      const comments = {}
+
+      snapshot.forEach((commentDoc) => {
+        const items = commentDoc.data()?.items
+        comments[commentDoc.id] = Array.isArray(items) ? items : []
+      })
+
+      onData(comments)
+    },
+    onError,
+  )
+}
+
 export function saveBookComment(bookId, comment) {
   return setDoc(
-    globalDataRef,
+    bookCommentsRef(bookId),
     withTimestamp({
-      comments: {
-        [bookId]: arrayUnion(cleanForFirestore(comment)),
-      },
+      items: arrayUnion(cleanForFirestore(comment)),
     }),
     { merge: true },
   )
+}
+
+export function migrateLegacyComments(comments = {}) {
+  const writes = Object.entries(comments)
+    .filter(([, items]) => Array.isArray(items) && items.length)
+    .map(([bookId, items]) => (
+      setDoc(
+        bookCommentsRef(bookId),
+        withTimestamp({ items: arrayUnion(...items.map(cleanForFirestore)) }),
+        { merge: true },
+      )
+    ))
+
+  return Promise.all(writes)
 }
 
 export function saveUserData(userId, data) {

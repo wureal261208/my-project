@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/reader-text/(.*)",
+      "destination": "/api/reader-text"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
