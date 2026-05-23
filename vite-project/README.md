@@ -130,4 +130,6 @@ npm run build
 
 ## Production Note
 
-`/api/reader-text` is currently provided by the Vite development server in `vite.config.js`. It works during `npm run dev`, but static hosting needs a production API route or serverless function for reader text fetching.
+`/api/reader-text` is available in local development through `vite.config.js` and on Vercel through `api/reader-text/[...path].js`. `vercel.json` rewrites client routes such as `/reader`, `/profile`, and `/admin` back to the React app so direct links and refreshes do not 404.
+
+For Vercel, set the project root directory to `vite-project`, build command to `npm run build`, and output directory to `dist`.

@@ -1,7 +1,6 @@
 import ReaderChapterStrip from './ReaderChapterStrip'
 
 function ReaderFrame({
-  activeBook,
   chapterPage,
   chapterStrip,
   currentChapter,
@@ -50,12 +49,18 @@ function ReaderFrame({
         </div>
       ) : readerUrl ? (
         <div className="reader-source-fallback">
-          <p>{readerMessage || 'Readable text is not available for this generated page.'}</p>
-          <a href={readerUrl} rel="noreferrer" target="_blank">Open original reader</a>
-          <iframe loading="lazy" src={readerUrl} title={`Read ${activeBook.title}`} />
+          <i className="bi bi-file-earmark-text" />
+          <p>{readerMessage || 'Readable text is not available for this book yet.'}</p>
+          <a href={readerUrl} rel="noreferrer" target="_blank">
+            <i className="bi bi-box-arrow-up-right" />
+            Open original reader
+          </a>
         </div>
       ) : (
-        <p>This book does not include a readable text link.</p>
+        <div className="reader-source-fallback">
+          <i className="bi bi-file-earmark-x" />
+          <p>This book does not include reader text. Add chapter content, reader text, or a reader URL in Management.</p>
+        </div>
       )}
       <ReaderChapterStrip
         chapters={chapterStrip}
