@@ -166,15 +166,21 @@ function ReaderPage({
         if (!response.ok) throw new Error(`Reader source returned ${response.status}`)
 
         const source = await response.text()
+        if (isAppShellResponse(source)) throw new Error('reader-api-returned-app-shell')
+
         const text = cleanBookText(isHtmlReaderSource(readerTextUrl, response) ? htmlToText(source) : source)
 
         if (!isCurrentRequest) return
 
         commitReaderState(text, text ? 'ready' : 'missing', text ? '' : 'This reader source did not include readable text.')
-      } catch {
+      } catch (error) {
         if (!isCurrentRequest) return
 
-        commitReaderState('', 'error', 'Could not load text for sliced chapter pages. Open the original reader instead.')
+        const message =
+          error?.message === 'reader-api-returned-app-shell'
+            ? 'Reader text API returned the app page instead of book text. Check the Vercel API route.'
+            : 'Could not load text for sliced chapter pages. Open the original reader instead.'
+        commitReaderState('', 'error', message)
       }
     }
 
@@ -293,6 +299,7 @@ function ReaderPage({
 
       <div className="reader-main">
         <ReaderFrame
+          activeBook={activeBook}
           chapterPage={chapterPage}
           chapterStrip={chapterStrip}
           currentChapter={currentChapter}
@@ -549,6 +556,10 @@ function buildMissingReaderModel(book, metadataChapters) {
 function isHtmlReaderSource(url, response) {
   const contentType = response.headers.get('content-type') || ''
   return contentType.includes('text/html') || /\.html?($|\?)/i.test(url)
+}
+
+function isAppShellResponse(source) {
+  return /<div\s+id=["']root["']\s*><\/div>/i.test(source) && /<script[^>]+\/assets\/index-/i.test(source)
 }
 
 function htmlToText(source) {
