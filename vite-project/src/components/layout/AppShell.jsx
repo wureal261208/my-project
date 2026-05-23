@@ -1,34 +1,83 @@
+import { useEffect, useState } from 'react'
 import { getInitials } from '../../utils/bookUtils'
 import logo from '../../assets/logo.jpg'
 import { useNavigation } from '../../context/navigation'
+import { ADMIN_EMAILS } from '../../data/bookData'
 
 const navItems = [
   { id: 'home', label: 'Home', icon: 'bi-house' },
   { id: 'discover', label: 'Discover', icon: 'bi-compass' },
   { id: 'profile', label: 'Profile', icon: 'bi-person-circle', private: true },
-  { id: 'admin', label: 'Admin', icon: 'bi-shield-lock', admin: true },
+  { id: 'admin', label: 'Management', icon: 'bi-shield-lock', admin: true },
 ]
+const managementNavIds = ['profile', 'admin']
 
 function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme = 'paper' }) {
   const { activePage, isPageLoading, navigateTo } = useNavigation()
+  const [rememberedAdminAccess, setRememberedAdminAccess] = useState(false)
   const isGuest = account?.role === 'guest'
+  const isAdmin = account?.role === 'admin' || ADMIN_EMAILS.includes(account?.email)
   const isAdminPage = activePage === 'admin'
+  const canShowAdminNav = isAdmin || isAdminPage || rememberedAdminAccess
+  const isManagementNavContext = canShowAdminNav && managementNavIds.includes(activePage)
   const displayName = account?.name || 'None Account'
-  const visibleNavItems = ['admin', 'profile'].includes(activePage)
-    ? navItems.filter((item) => item.id === activePage || (activePage === 'admin' && item.id === 'profile'))
-    : navItems
+  const visibleNavItems = navItems.filter((item) => {
+    if (isManagementNavContext && !managementNavIds.includes(item.id)) return false
+    if (item.admin && !canShowAdminNav) return false
+    if (item.private && isGuest) return false
+    return true
+  })
+
+  useEffect(() => {
+    let isCurrent = true
+
+    if (isGuest) {
+      if (rememberedAdminAccess) {
+        queueMicrotask(() => {
+          if (isCurrent) setRememberedAdminAccess(false)
+        })
+      }
+      return () => {
+        isCurrent = false
+      }
+    }
+
+    if ((isAdmin || isAdminPage) && !rememberedAdminAccess) {
+      queueMicrotask(() => {
+        if (isCurrent) setRememberedAdminAccess(true)
+      })
+    }
+
+    return () => {
+      isCurrent = false
+    }
+  }, [isAdmin, isAdminPage, isGuest, rememberedAdminAccess])
+
+  function handleLogoClick() {
+    if (canShowAdminNav) {
+      navigateTo('admin')
+      return
+    }
+
+    if (isGuest) {
+      onAuth()
+      return
+    }
+
+    navigateTo('profile')
+  }
 
   return (
     <div className={`book-app app-theme-${websiteTheme}`}>
       <header className="site-header">
-        <button className="brand-button" onClick={() => !isAdminPage && navigateTo('home')} type="button">
+        <button className="brand-button" onClick={handleLogoClick} type="button">
           <img src={logo} alt="BookWorm logo" />
           <span>BookWorm</span>
         </button>
 
         <nav className="main-nav" aria-label="Main navigation">
           {visibleNavItems.map((item) => {
-            if (item.admin && account?.role !== 'admin') return null
+            if (item.admin && !canShowAdminNav) return null
             if (item.private && isGuest) return null
 
             return (
@@ -92,7 +141,7 @@ function AppShell({ account, children, onAuth, onGuest, onLogout, websiteTheme =
               </>
             )}
             {!isGuest && <button onClick={() => navigateTo('profile')} type="button">Profile</button>}
-            {activePage === 'admin' && <button onClick={() => navigateTo('admin')} type="button">Admin</button>}
+            {canShowAdminNav && <button onClick={() => navigateTo('admin')} type="button">Management</button>}
           </nav>
           <div>
             <span>Reader tools</span>

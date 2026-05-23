@@ -9,11 +9,9 @@ const DISPLAY_NAME_PATTERN = /^[\p{L}\p{N} ._'-]+$/u
 
 function ProfilePage({
   account,
-  fontScale,
   onProfileUpdate,
   onResetPassword,
   readerTheme,
-  setFontScale,
   setReaderTheme,
   setWebsiteTheme,
   websiteTheme,
@@ -22,11 +20,9 @@ function ProfilePage({
     <div className="profile-page settings-only-page">
       <ProfileSettings
         account={account}
-        fontScale={fontScale}
         onProfileUpdate={onProfileUpdate}
         onResetPassword={onResetPassword}
         readerTheme={readerTheme}
-        setFontScale={setFontScale}
         setReaderTheme={setReaderTheme}
         setWebsiteTheme={setWebsiteTheme}
         websiteTheme={websiteTheme}
@@ -37,11 +33,9 @@ function ProfilePage({
 
 function ProfileSettings({
   account,
-  fontScale,
   onProfileUpdate,
   onResetPassword,
   readerTheme,
-  setFontScale,
   setReaderTheme,
   setWebsiteTheme,
   websiteTheme,
@@ -174,21 +168,11 @@ function ProfileSettings({
                 <option value="night">Night</option>
               </select>
             </label>
-            <label>
-              Font size
-              <input
-                max="24"
-                min="15"
-                type="range"
-                value={fontScale}
-                onChange={(event) => setFontScale(Number(event.target.value))}
-              />
-            </label>
           </div>
-          <div className={`settings-reader-preview reader-${readerTheme}`} style={{ fontSize: `${fontScale}px` }}>
+          <div className={`settings-reader-preview reader-${readerTheme}`}>
             <p className="mono-eyebrow">Chapter preview</p>
             <h4>A quiet page for focused reading</h4>
-            <p>Reader mode and font size sync with the reading screen.</p>
+            <p>Reader mode syncs with the reading screen.</p>
           </div>
         </div>
 

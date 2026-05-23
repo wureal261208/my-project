@@ -8,7 +8,6 @@ function ReaderFrame({
   currentChapterIndex,
   currentPage,
   currentReaderParagraphs,
-  fontScale,
   guestChapterLimit,
   hasReachedGuestLimit,
   isGuest,
@@ -43,7 +42,7 @@ function ReaderFrame({
           <p>Loading chapter text...</p>
         </div>
       ) : currentReaderParagraphs.length ? (
-        <div className="reader-text-page" aria-live="polite" style={{ fontSize: `${fontScale}px` }}>
+        <div className="reader-text-page" aria-live="polite">
           <p className="reader-page-kicker">{currentChapter.title} - Page {chapterPage}</p>
           {currentReaderParagraphs.map((paragraph, index) => (
             <p key={`${currentPage}-${index}`}>{paragraph}</p>

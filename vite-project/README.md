@@ -1,58 +1,88 @@
 # BookWorm Reading Platform
 
-BookWorm is a modern React reading web app built for browsing, discovering, saving, and reading public-domain books. The interface focuses on a smooth reader experience, lightweight personalization, and small interactive details that make the site feel active instead of static.
+BookWorm is a React reading web app for browsing public-domain books, reading by chapter/page, saving notes, tracking progress, and managing book data. The project is structured to match the MindX React course flow: React fundamentals, state/props, UI styling, async data, useEffect, Context, routing behavior, deployment, and final product presentation.
 
-## Features
+## Current Status
 
-- Home page with animated featured-book carousel, hot books, recommendations, and continue-reading books.
-- Discover page with dropdown search suggestions, book covers, recent search history, filtering, and pagination.
-- Book detail page with metadata, chapters, similar-book recommendations, reads count, and reader comments.
-- Reader page with checkpoint saving, chapter/page navigation, guest preview limits, reading themes, highlights, and finished status.
-- Profile page with saved books, reading progress, reading streak, quote highlights, and reading history.
-- Guest and member behavior split: guests can preview limited chapters, while logged-in accounts can read without that limit.
-- Local-first persistence for checkpoints, comments, favorites, highlights, reads, reader settings, and search history.
+- Data is stored in Firebase Firestore, not browser storage.
+- Firebase Authentication handles login, signup, logout, password reset, and session restore.
+- React state controls the current page, selected book, reader settings, forms, and all UI updates.
+- Guest users can browse and preview limited chapters.
+- Logged-in users can keep private reading progress, favorites, notes, highlights, checkpoints, and reader theme.
+- Admin/staff users can access management features from the app role flow.
+- The reader checks real book text, splits chapters by chapter markers, and adapts page count per chapter.
 
 ## Tech Stack
 
-- React 19
-- Vite 8
+- React 19 with Vite 8
+- React Router
+- Firebase Authentication
+- Firebase Firestore
 - Bootstrap Icons
 - ESLint
-- LocalStorage for client-side persistence
-- Lazy-loaded route pages for a lighter initial app load
+- Vite development middleware for Gutenberg reader text proxy
 
-## React Hooks Used
+## MindX Course Mapping
 
-- `useState`: manages UI state such as active hero book, paused carousel state, comment text, reader controls, search state, pagination, and account-driven data.
-- `useEffect`: handles side effects such as carousel timing, checkpoint persistence, reader progress updates, localStorage synchronization, and page lifecycle behavior.
-- `lazy` and `Suspense`: split page-level components so Home, Discover, Detail, Reader, Profile, and Admin can load on demand.
-- Context provider pattern: centralizes navigation behavior so nested components can move between pages without prop chains becoming too noisy.
+- JavaScript and ES6+: array/object helpers, async functions, module imports, data transformation utilities.
+- ReactJS: component-based UI in `src/components`.
+- State and props: app state is owned in `src/App.jsx` and passed to page components.
+- UI/CSS library: Bootstrap Icons plus custom responsive CSS in `src/App.css`.
+- Async and useEffect: Firebase subscriptions, auth session checking, book loading, and reader text loading.
+- Context: `src/context/NavigationContext.jsx` shares navigation behavior across nested components.
+- Routing: React state controls which page renders, while `react-router-dom` mirrors that state into browser URLs for Home, Discover, Detail, Reader, Profile, Admin, and Auth.
+- Custom utilities/hooks style: book/chapter parsing lives in `src/utils`.
+- Deployment: `npm run build` creates the production build. The reader text proxy needs a server/serverless endpoint for real production hosting.
 
-## Tools Used
-
-- `npm.cmd run dev`: runs the local Vite development server.
-- `npm.cmd run lint`: checks code style and React hook correctness with ESLint.
-- `npm.cmd run build`: creates a production-ready Vite build.
-- Browser verification: used to confirm UI behavior such as carousel movement, comment submission, and rendered page state.
-- PowerShell: used for local file inspection, build commands, and project verification inside the shared workspace.
-
-## Project Structure
+## System Flow
 
 ```text
-src/
-  components/
-    auth/          Authentication UI
-    books/         Reusable book grid and book card components
-    layout/        App shell, header, footer, and global layout
-    pages/         Home, Discover, Detail, Reader, Profile, and Admin pages
-  context/         Shared navigation context
-  data/            Fallback book data and storage key constants
-  utils/           Book formatting and helper utilities
-  App.jsx          Main app state, routing, persistence, and permissions
-  App.css          Global styling and responsive UI
+Open app
+  -> Firebase checks current session
+  -> Guest account is used if no session exists
+  -> Global Firestore data loads books, views, comments, staff, and known users
+  -> User Firestore data loads only after login
+  -> User browses books or opens reader
+  -> Reader loads text, detects chapters, paginates each chapter, then saves progress
 ```
 
-## Getting Started
+## Login Flow
+
+```text
+Guest
+  -> Login or signup
+  -> Firebase Authentication validates account
+  -> App maps role: admin, staff, or user
+  -> Firestore subscribes to bookwormUsers/{uid}
+  -> Private data is saved under that uid
+```
+
+## Firestore Data
+
+```text
+bookwormData/global
+  localBooks
+  viewCounts
+  bookReaders
+  comments
+  staff
+  knownUsers
+
+bookwormUsers/{uid}
+  favorites
+  history
+  readingActivity
+  progress
+  checkpoints
+  notes
+  highlights
+  searchHistory
+  accountSettings
+  websiteTheme
+  readerTheme
+```
+
+## Run On Another Machine
 
 Install dependencies:
 
@@ -60,54 +90,44 @@ Install dependencies:
 npm install
 ```
 
-Start the development server:
+Use Node.js 20.19+ or 22.12+ so Vite 8 and React Router run correctly.
+
+Create Firebase config when needed:
+
+```bash
+cp .env.example .env
+```
+
+Then fill the `VITE_FIREBASE_*` values from Firebase Project Settings. The app also keeps the current Firebase config as a fallback for local demo runs.
+
+Start the app:
 
 ```bash
 npm run dev
 ```
 
-Open the app:
+Open:
 
 ```text
 http://127.0.0.1:5173/
 ```
 
-## Quality Checks
+## Firebase Setup
 
-Run lint:
+Enable these services in Firebase Console:
+
+- Authentication: Email/Password provider
+- Firestore Database
+
+Use `firestore.rules` as the prototype rule file. The current rule allows public writes to `bookwormData/global` so guest view counts and guest comments still work. Before production, split public counters/comments from admin-only book/staff data or move writes behind a backend API.
+
+## Quality Checks
 
 ```bash
 npm run lint
-```
-
-Create a production build:
-
-```bash
 npm run build
 ```
 
-## Persistence Model
+## Production Note
 
-BookWorm currently uses browser localStorage to keep the demo app fast and easy to run without a backend. Stored data includes:
-
-- Account/session state
-- Favorites and saved books
-- Reading checkpoints
-- Reading progress and finished status
-- Book reads count
-- Comments
-- Quote highlights
-- Reading streak activity
-- Search history and reader theme
-
-This makes the project suitable for frontend prototyping. For production, these storage flows can be moved to Firebase, Supabase, or a custom API while keeping the same UI contracts.
-
-## Reader Permissions
-
-- Guest users can preview the first three chapters of a book.
-- Logged-in users can access all chapters and keep unlimited checkpoints.
-- Chapter links in the detail page respect the same access rules as the reader.
-
-## Design Direction
-
-The UI is designed to feel calm, editorial, and easy to scan. Book covers carry most of the visual energy, while motion is used for transitions, lazy loading, carousel movement, and page state changes. The goal is to make the site feel inspiring without making common reading workflows harder.
+`/api/reader-text` is currently provided by the Vite development server in `vite.config.js`. It works during `npm run dev`, but static hosting needs a production API route or serverless function for reader text fetching.

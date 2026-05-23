@@ -2,11 +2,9 @@ function ReaderControls({
   chapterPage,
   chapterProgressValue,
   currentChapter,
-  fontScale,
   guestChapterLimit,
   isFinished,
   isGuest,
-  onChangeFontScale,
   onMarkChapterDone,
   onReaderTheme,
   progressValue,
@@ -21,14 +19,6 @@ function ReaderControls({
           <option value="focus">Focus</option>
           <option value="night">Night</option>
         </select>
-      </label>
-      <label>
-        Font size
-        <div className="reader-font-controls">
-          <button disabled={fontScale <= 15} onClick={() => onChangeFontScale(-1)} type="button">A-</button>
-          <span>{fontScale}px</span>
-          <button disabled={fontScale >= 24} onClick={() => onChangeFontScale(1)} type="button">A+</button>
-        </div>
       </label>
       <div className="reader-page-meter">
         <span>{currentChapter.label} - Page {chapterPage} / {currentChapter.pages}</span>

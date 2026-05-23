@@ -102,15 +102,15 @@ function AdminPage({
     <div className="admin-page">
       <section className="page-title admin-title">
         <div>
-          <p className="mono-eyebrow">Admin</p>
-          <h1>BookWorm control panel</h1>
+          <p className="mono-eyebrow">Management</p>
+          <h1>BookWorm management</h1>
         </div>
         <p>
           Manage the books, reader content, access rules, and team accounts that directly affect the main BookWorm site.
         </p>
       </section>
 
-      <div className="admin-sticky-switcher" role="tablist" aria-label="Admin sections">
+      <div className="admin-sticky-switcher" role="tablist" aria-label="Management sections">
         <button className={activeAdminSection === 'book' ? 'active' : ''} onClick={() => setActiveAdminSection('book')} type="button">
           <i className="bi bi-journal-plus" />
           Push Book
@@ -123,7 +123,7 @@ function AdminPage({
 
       <div className="metrics admin-metrics">
         <article><strong>{books.length}</strong><span>Books on main</span></article>
-        <article><strong>{publishedBooks}</strong><span>Published admin books</span></article>
+        <article><strong>{publishedBooks}</strong><span>Published managed books</span></article>
         <article><strong>{detailReadyBooks}</strong><span>Detail ready</span></article>
         <article><strong>{readerReadyBooks}</strong><span>Reader ready</span></article>
       </div>
@@ -289,7 +289,7 @@ function AdminPage({
               )}
               <button className="primary-button" type="submit">
                 <i className="bi bi-cloud-upload" />
-                {adminBook.id ? 'Update book' : 'Add book to admin'}
+                {adminBook.id ? 'Update book' : 'Add book to management'}
               </button>
             </div>
           </form>
@@ -304,7 +304,7 @@ function AdminPage({
 
           <div className="admin-two-col">
             <section className="admin-table">
-              <h2>Admin books</h2>
+              <h2>Managed books</h2>
               {filteredLocalBooks.length ? (
                 filteredLocalBooks.map((book) => {
                   const totalPages = getTotalPages(book)
@@ -356,12 +356,12 @@ function AdminPage({
               <p className="mono-eyebrow">Team access</p>
               <h2>Deputy dev</h2>
             </div>
-            <span>Admin accounts that can maintain the main site</span>
+            <span>Management accounts that can maintain the main site</span>
           </div>
 
           <form className="admin-form compact-form" onSubmit={addStaff}>
             <p className="form-note">
-              Staff created here can login with their email and default password <strong>Admin123</strong> to access Admin.
+              Staff created here can login with their email and default password <strong>Admin123</strong> to access Management.
             </p>
             <label>Name<input name="name" placeholder="Deputy name" /></label>
             <label>Email<input name="email" placeholder="deputy@bookworm.com" type="email" /></label>

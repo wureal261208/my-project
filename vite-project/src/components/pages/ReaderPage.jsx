@@ -19,7 +19,6 @@ function ReaderPage({
   checkpoints,
   comments = [],
   favorites,
-  fontScale,
   onBack,
   onComment,
   onDiscover,
@@ -29,7 +28,6 @@ function ReaderPage({
   readerTheme,
   startPage,
   setCheckpoints,
-  setFontScale,
   setProgress,
   setReaderTheme,
 }) {
@@ -240,10 +238,6 @@ function ReaderPage({
     if (chapter) setCurrentPage(chapter.startPage)
   }
 
-  function changeFontScale(direction) {
-    setFontScale((current) => clampNumber(current + direction, 15, 24))
-  }
-
   function markChapterDone() {
     const finalChapterPage = currentChapter.startPage + currentChapter.pages - 1
     handlePageChange(finalChapterPage)
@@ -287,11 +281,9 @@ function ReaderPage({
         chapterPage={chapterPage}
         chapterProgressValue={chapterProgressValue}
         currentChapter={currentChapter}
-        fontScale={fontScale}
         guestChapterLimit={GUEST_CHAPTER_LIMIT}
         isFinished={isFinished}
         isGuest={isGuest}
-        onChangeFontScale={changeFontScale}
         onMarkChapterDone={markChapterDone}
         onReaderTheme={setReaderTheme}
         progressValue={progressValue}
@@ -307,7 +299,6 @@ function ReaderPage({
           currentChapterIndex={currentChapterIndex}
           currentPage={currentPage}
           currentReaderParagraphs={currentReaderParagraphs}
-          fontScale={fontScale}
           guestChapterLimit={GUEST_CHAPTER_LIMIT}
           hasReachedGuestLimit={hasReachedGuestLimit}
           isGuest={isGuest}
@@ -898,10 +889,6 @@ function findMarkerIndex(text, markers) {
 
 function clampPage(page, totalPages) {
   return Math.min(totalPages, Math.max(1, Number(page) || 1))
-}
-
-function clampNumber(value, min, max) {
-  return Math.min(max, Math.max(min, Number(value) || min))
 }
 
 export default ReaderPage

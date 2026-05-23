@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -58,8 +59,21 @@ const emptyAdminBook = {
   chaptersDraft: [{ title: 'Chapter 1', pages: '10', content: '' }],
 }
 const guestAccount = { id: 'guest', name: 'None Account', email: 'guest@bookworm.local', role: 'guest' }
-const pageInitialState = { activePage: 'home', isPageLoading: false }
 const SEARCH_HISTORY_LIMIT = 8
+const PAGE_PATHS = {
+  home: '/',
+  discover: '/discover',
+  detail: '/book',
+  reader: '/reader',
+  profile: '/profile',
+  admin: '/admin',
+  auth: '/auth',
+}
+const PATH_PAGES = Object.fromEntries(Object.entries(PAGE_PATHS).map(([page, path]) => [path, page]))
+const pageInitialState = {
+  activePage: getPageFromPath(typeof window === 'undefined' ? '/' : window.location.pathname),
+  isPageLoading: false,
+}
 
 function pageReducer(state, action) {
   if (action.type === 'start') return { ...state, isPageLoading: true }
@@ -69,6 +83,8 @@ function pageReducer(state, action) {
 }
 
 function App() {
+  const location = useLocation()
+  const routerNavigate = useNavigate()
   const [account, setAccount] = useState(guestAccount)
   const [authError, setAuthError] = useState('')
   const [authErrorField, setAuthErrorField] = useState('')
@@ -100,7 +116,6 @@ function App() {
   const [topic, setTopic] = useState('all')
   const [readerTheme, setReaderTheme] = useState(userDataDefaults.readerTheme)
   const [websiteTheme, setWebsiteTheme] = useState(userDataDefaults.websiteTheme)
-  const [fontScale, setFontScale] = useState(userDataDefaults.fontScale)
   const [authForm, setAuthForm] = useState(emptyAuthForm)
   const [adminBook, setAdminBook] = useState(emptyAdminBook)
   const [knownUsers, setKnownUsers] = useState(globalDataDefaults.knownUsers)
@@ -109,6 +124,7 @@ function App() {
   const accountSettingsRef = useRef(accountSettings)
   const globalDataSnapshotRef = useRef('')
   const userDataSnapshotRef = useRef('')
+  const pendingFavoriteUpdatesRef = useRef([])
   const syncErrorRef = useRef('')
   const activePage = pageState.activePage
 
@@ -119,18 +135,28 @@ function App() {
   )
 
   const navigateTo = useCallback((page, options = {}) => {
+    const nextPage = PAGE_PATHS[page] ? page : 'home'
+    const nextPath = PAGE_PATHS[nextPage]
     window.clearTimeout(routeTimerRef.current)
 
+    const openRoute = () => {
+      if (window.location.pathname !== nextPath) {
+        routerNavigate(nextPath, { replace: Boolean(options.replace) })
+      }
+    }
+
     if (options.instant) {
-      dispatchPage({ type: 'instant', page })
+      dispatchPage({ type: 'instant', page: nextPage })
+      openRoute()
       return
     }
 
     dispatchPage({ type: 'start' })
     routeTimerRef.current = window.setTimeout(() => {
-      dispatchPage({ type: 'finish', page })
+      openRoute()
+      dispatchPage({ type: 'finish', page: nextPage })
     }, 420)
-  }, [])
+  }, [routerNavigate])
 
   const handleDataSyncError = useCallback((error) => {
     const message =
@@ -168,13 +194,11 @@ function App() {
       accountSettings,
       websiteTheme,
       readerTheme,
-      fontScale,
     }),
     [
       accountSettings,
       checkpoints,
       favorites,
-      fontScale,
       highlights,
       history,
       notes,
@@ -189,6 +213,14 @@ function App() {
   useEffect(() => {
     return () => window.clearTimeout(routeTimerRef.current)
   }, [])
+
+  useEffect(() => {
+    const nextPage = getPageFromPath(location.pathname)
+    if (nextPage === activePage) return
+
+    window.clearTimeout(routeTimerRef.current)
+    dispatchPage({ type: 'instant', page: nextPage })
+  }, [activePage, location.pathname])
 
   useEffect(() => {
     accountSettingsRef.current = accountSettings
@@ -238,7 +270,6 @@ function App() {
         setAccountSettings(userDataDefaults.accountSettings)
         setWebsiteTheme(userDataDefaults.websiteTheme)
         setReaderTheme(userDataDefaults.readerTheme)
-        setFontScale(userDataDefaults.fontScale)
         setUserDataReady(false)
         userDataSnapshotRef.current = ''
       })
@@ -254,7 +285,7 @@ function App() {
     return subscribeUserData(
       account.id,
       (data) => {
-        const nextData = {
+        const savedData = {
           favorites: data.favorites || [],
           history: data.history || [],
           readingActivity: data.readingActivity || {},
@@ -266,10 +297,15 @@ function App() {
           accountSettings: data.accountSettings || {},
           websiteTheme: data.websiteTheme || userDataDefaults.websiteTheme,
           readerTheme: data.readerTheme || userDataDefaults.readerTheme,
-          fontScale: data.fontScale || userDataDefaults.fontScale,
+        }
+        const pendingFavoriteUpdates = pendingFavoriteUpdatesRef.current
+        const nextData = {
+          ...savedData,
+          favorites: applyFavoriteUpdates(savedData.favorites, pendingFavoriteUpdates),
         }
 
-        userDataSnapshotRef.current = stableStringify(nextData)
+        userDataSnapshotRef.current = stableStringify(savedData)
+        pendingFavoriteUpdatesRef.current = []
         setFavorites(nextData.favorites)
         setHistory(nextData.history)
         setReadingActivity(nextData.readingActivity)
@@ -281,7 +317,6 @@ function App() {
         setAccountSettings(nextData.accountSettings)
         setWebsiteTheme(nextData.websiteTheme)
         setReaderTheme(nextData.readerTheme)
-        setFontScale(nextData.fontScale)
         setUserDataReady(true)
       },
       (error) => {
@@ -309,8 +344,13 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const currentRoute = getPageFromPath(window.location.pathname)
+
       if (!user) {
         setAccount(guestAccount)
+        if (currentRoute === 'profile' || currentRoute === 'admin') {
+          navigateTo('home', { instant: true, replace: true })
+        }
         setAuthReady(true)
         return
       }
@@ -328,12 +368,33 @@ function App() {
 
       setAccount(nextAccount)
       setKnownUsers((current) => upsertUser(current, nextAccount))
-      navigateTo(nextAccount.role === 'admin' ? 'admin' : 'home', { instant: true })
+      if (currentRoute === 'auth') {
+        navigateTo(nextAccount.role === 'admin' ? 'admin' : 'home', { instant: true, replace: true })
+      } else if (currentRoute === 'admin' && nextAccount.role !== 'admin') {
+        navigateTo('home', { instant: true, replace: true })
+      }
       setAuthReady(true)
     })
 
     return unsubscribe
   }, [getAccountRole, navigateTo])
+
+  useEffect(() => {
+    if (account.role === 'guest' || !account.email) return
+
+    const nextRole = getAccountRole(account.email)
+    if (nextRole === account.role) return
+
+    let isCurrent = true
+    queueMicrotask(() => {
+      if (!isCurrent) return
+      setAccount((current) => ({ ...current, role: nextRole }))
+    })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [account.email, account.role, getAccountRole])
 
   useEffect(() => {
     if (!globalDataReady || account.role === 'guest') return
@@ -603,15 +664,21 @@ function App() {
   }
 
   function toggleFavorite(bookId) {
+    if (!bookId) return
+
     if (account.role === 'guest') {
       setToast({ type: 'error', message: 'Login to save books to your shelf.' })
       navigateTo('auth')
       return
     }
 
-    setFavorites((current) =>
-      current.includes(bookId) ? current.filter((id) => id !== bookId) : [...current, bookId],
-    )
+    const action = favorites.includes(bookId) ? 'remove' : 'add'
+    if (!userDataReady) {
+      pendingFavoriteUpdatesRef.current = [...pendingFavoriteUpdatesRef.current, { action, bookId }]
+      setToast({ type: 'success', message: 'Bookmark updated. It will sync when your shelf is ready.' })
+    }
+
+    setFavorites((current) => applyFavoriteUpdates(current, [{ action, bookId }]))
   }
 
   function addLocalBook(event) {
@@ -741,7 +808,6 @@ function App() {
         checkpoints={checkpoints}
         comments={comments[selectedBook?.id] || []}
         favorites={favorites}
-        fontScale={fontScale}
         onBack={() => navigateTo('detail')}
         onComment={addComment}
         onDiscover={() => navigateTo('discover')}
@@ -751,7 +817,6 @@ function App() {
         readerTheme={readerTheme}
         startPage={readerStartPage}
         setCheckpoints={setCheckpoints}
-        setFontScale={setFontScale}
         setProgress={setProgress}
         setReaderTheme={setReaderTheme}
       />
@@ -774,7 +839,6 @@ function App() {
         account={account}
         books={allBooks}
         favorites={favorites}
-        fontScale={fontScale}
         history={history}
         highlights={highlights}
         onProfileUpdate={updateAccountProfile}
@@ -783,7 +847,6 @@ function App() {
         progress={progress}
         readingDays={readingActivity[getAccountKey(account)] || []}
         readerTheme={readerTheme}
-        setFontScale={setFontScale}
         setReaderTheme={setReaderTheme}
         setWebsiteTheme={updateWebsiteTheme}
         viewCounts={viewCounts}
@@ -835,6 +898,15 @@ function getAccountKey(account) {
 
 function getViewerCounts(bookReaders) {
   return Object.fromEntries(Object.entries(bookReaders).map(([bookId, readers]) => [bookId, readers.length]))
+}
+
+function applyFavoriteUpdates(favorites = [], updates = []) {
+  return updates.reduce((result, update) => {
+    if (!update?.bookId) return result
+
+    const withoutBook = result.filter((id) => id !== update.bookId)
+    return update.action === 'remove' ? withoutBook : [...withoutBook, update.bookId]
+  }, favorites)
 }
 
 function getGuestCommentName(bookId, commentIndex) {
@@ -973,6 +1045,11 @@ function getEditableChapters(book) {
 
 function getReaderFormatKey(readerUrl) {
   return /\.txt($|\?)/i.test(readerUrl) ? 'text/plain' : 'text/html'
+}
+
+function getPageFromPath(pathname = '/') {
+  const normalizedPath = pathname.replace(/\/+$/, '') || '/'
+  return PATH_PAGES[normalizedPath] || 'home'
 }
 
 function getAuthMessage(code) {
