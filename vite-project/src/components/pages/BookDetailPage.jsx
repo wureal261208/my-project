@@ -32,7 +32,6 @@ function BookDetailPage({
   const [showSavePrompt, setShowSavePrompt] = useState(false)
   const [showChapterPrompt, setShowChapterPrompt] = useState(false)
   const [activeDetailTab, setActiveDetailTab] = useState('chapters')
-  const [commentSort, setCommentSort] = useState('newest')
 
   if (!book) {
     return (
@@ -52,14 +51,9 @@ function BookDetailPage({
   const rating = Math.min(5, Math.max(3.8, (book.download_count || 1000) / 25000 + 3.6)).toFixed(1)
   const checkpointKey = getCheckpointKey(account, book)
   const checkpoint = account?.role === 'guest' ? null : checkpoints[checkpointKey]
-  const sortedComments = [...comments].sort((first, second) => {
-    const firstTime = new Date(first.createdAt).getTime()
-    const secondTime = new Date(second.createdAt).getTime()
-
-    return commentSort === 'newest' ? secondTime - firstTime : firstTime - secondTime
-  })
-  const visibleComments = showAllComments ? sortedComments : sortedComments.slice(0, COMMENT_PREVIEW_LIMIT)
-  const hasMoreComments = sortedComments.length > COMMENT_PREVIEW_LIMIT
+  const latestComments = getLatestComments(comments)
+  const visibleComments = showAllComments ? latestComments : latestComments.slice(0, COMMENT_PREVIEW_LIMIT)
+  const hasMoreComments = latestComments.length > COMMENT_PREVIEW_LIMIT
   const recommendations = books
     .filter((item) => item.id !== book.id)
     .map((item) => ({
@@ -131,11 +125,9 @@ function BookDetailPage({
       {activeDetailTab === 'comments' && (
         <DetailComments
           account={account}
-          commentSort={commentSort}
           commentText={commentText}
-          comments={sortedComments}
+          comments={latestComments}
           hasMoreComments={hasMoreComments}
-          onCommentSort={setCommentSort}
           onCommentText={setCommentText}
           onSubmitComment={submitComment}
           onToggleComments={() => setShowAllComments((current) => !current)}
@@ -169,6 +161,15 @@ function BookDetailPage({
 function getCheckpointKey(account, book) {
   const accountKey = account?.role === 'guest' ? 'guest' : account?.id || account?.email || 'user'
   return `${accountKey}:${book.id}`
+}
+
+function getLatestComments(comments = []) {
+  return [...comments].sort((first, second) => {
+    const firstTime = new Date(first.createdAt).getTime()
+    const secondTime = new Date(second.createdAt).getTime()
+
+    return secondTime - firstTime
+  })
 }
 
 export default BookDetailPage

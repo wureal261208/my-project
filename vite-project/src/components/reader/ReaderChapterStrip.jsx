@@ -1,11 +1,26 @@
+import { useEffect, useRef } from 'react'
+
 function ReaderChapterStrip({ chapters, currentChapterIndex, isGuest, guestChapterLimit, onChapter }) {
+  const stripRef = useRef(null)
+  const activeButtonRef = useRef(null)
+
+  useEffect(() => {
+    activeButtonRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    })
+  }, [currentChapterIndex])
+
   return (
-    <div className="reader-chapter-strip" aria-label="Nearby chapters">
+    <div className="reader-chapter-strip" aria-label="Book chapters" ref={stripRef}>
       {chapters.map((item) => (
         <button
+          aria-current={item.index === currentChapterIndex ? 'true' : undefined}
           className={item.index === currentChapterIndex ? 'active' : ''}
           key={item.id}
           onClick={() => onChapter(item.index)}
+          ref={item.index === currentChapterIndex ? activeButtonRef : null}
           type="button"
         >
           <small>{item.position}</small>

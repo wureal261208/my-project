@@ -23,6 +23,7 @@ import { auth } from './firebase'
 import { getAuthor, getCategory, getReaderUrl } from './utils/bookUtils'
 import {
   globalDataDefaults,
+  saveBookComment,
   saveGlobalData,
   saveUserData,
   stableStringify,
@@ -168,18 +169,6 @@ function App() {
     syncErrorRef.current = message
     setToast({ type: 'error', message })
   }, [])
-
-  const globalData = useMemo(
-    () => ({
-      managedBooks,
-      viewCounts,
-      bookReaders,
-      comments,
-      staff,
-      knownUsers,
-    }),
-    [bookReaders, comments, knownUsers, managedBooks, staff, viewCounts],
-  )
 
   const userData = useMemo(
     () => ({
@@ -432,12 +421,19 @@ function App() {
   useEffect(() => {
     if (!globalDataReady) return
 
-    const nextSnapshot = stableStringify(globalData)
+    const nextGlobalData = {
+      managedBooks,
+      viewCounts,
+      bookReaders,
+      staff,
+      knownUsers,
+    }
+    const nextSnapshot = stableStringify(nextGlobalData)
     if (nextSnapshot === globalDataSnapshotRef.current) return
 
     globalDataSnapshotRef.current = nextSnapshot
-    saveGlobalData(globalData).catch(handleDataSyncError)
-  }, [globalData, globalDataReady, handleDataSyncError])
+    saveGlobalData(nextGlobalData).catch(handleDataSyncError)
+  }, [bookReaders, globalDataReady, handleDataSyncError, knownUsers, managedBooks, staff, viewCounts])
 
   useEffect(() => {
     if (account.role === 'guest' || !userDataReady) return
@@ -649,10 +645,12 @@ function App() {
     const trimmedText = text.trim()
     if (!trimmedText) return
 
+    const accountKey = getAccountKey(account)
     const nextComment = {
-      id: `comment-${Date.now()}`,
+      id: `${bookId}-${accountKey}-comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       author: account.role === 'guest' ? getGuestCommentName(bookId, comments[bookId]?.length || 0) : account.name,
       role: account.role === 'guest' ? 'guest' : 'member',
+      accountId: accountKey,
       text: trimmedText,
       createdAt: new Date().toISOString(),
     }
@@ -661,6 +659,7 @@ function App() {
       ...current,
       [bookId]: [nextComment, ...(current[bookId] || [])].slice(0, 30),
     }))
+    saveBookComment(bookId, nextComment).catch(handleDataSyncError)
   }
 
   function toggleFavorite(bookId) {
@@ -683,7 +682,11 @@ function App() {
 
   function addManagedBook(event) {
     event.preventDefault()
-    if (!adminBook.title.trim()) return
+    const validationErrors = validateAdminBook(adminBook, managedBooks)
+    if (validationErrors.length) {
+      setToast({ type: 'error', message: validationErrors.slice(0, 2).join(' ') })
+      return
+    }
 
     const nextBook = createAdminBookRecord(adminBook)
 
@@ -923,6 +926,25 @@ function getPositiveInteger(value) {
   return Number.isFinite(number) && number > 0 ? Math.floor(number) : null
 }
 
+function validateAdminBook(adminBook, managedBooks = []) {
+  const duplicateTitle = managedBooks.some((book) => (
+    book.id !== adminBook.id && book.title?.trim().toLowerCase() === adminBook.title.trim().toLowerCase()
+  ))
+
+  return [
+    !hasText(adminBook.title) && 'Add a title.',
+    duplicateTitle && 'A managed book already uses this title.',
+    !hasText(adminBook.author) && 'Add an author.',
+    !hasText(adminBook.category) && 'Choose a category.',
+    !hasText(adminBook.cover) && 'Add a cover image.',
+    !isValidImageSource(adminBook.cover) && 'Cover must be an http(s) image URL or an uploaded image.',
+    !hasText(adminBook.description) && 'Add a description.',
+    !hasAdminReaderSource(adminBook) && 'Add a reader URL, reader text, or chapter content.',
+    hasText(adminBook.readerUrl) && !isValidHttpUrl(adminBook.readerUrl) && 'Reader URL must start with http:// or https://.',
+    !hasValidAdminChapter(adminBook) && 'Add at least one chapter with a title and page count above 0.',
+  ].filter(Boolean)
+}
+
 function createAdminBookRecord(adminBook) {
   const cover = adminBook.cover.trim()
   const readerText = adminBook.readerText.trim()
@@ -1045,6 +1067,35 @@ function getEditableChapters(book) {
 
 function getReaderFormatKey(readerUrl) {
   return /\.txt($|\?)/i.test(readerUrl) ? 'text/plain' : 'text/html'
+}
+
+function hasText(value) {
+  return String(value || '').trim().length > 0
+}
+
+function hasAdminReaderSource(book) {
+  return Boolean(hasText(book.readerUrl) || hasText(book.readerText) || book.chaptersDraft?.some((chapter) => hasText(chapter.content)))
+}
+
+function hasValidAdminChapter(book) {
+  return Boolean(book.chaptersDraft?.some((chapter) => hasText(chapter.title) && Number(chapter.pages) > 0))
+}
+
+function isValidHttpUrl(value) {
+  if (!hasText(value)) return true
+
+  try {
+    const url = new URL(String(value).trim())
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function isValidImageSource(value) {
+  if (!hasText(value)) return true
+  const source = String(value).trim()
+  return source.startsWith('data:image/') || isValidHttpUrl(source)
 }
 
 function getPageFromPath(pathname = '/') {

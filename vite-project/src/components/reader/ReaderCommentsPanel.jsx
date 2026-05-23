@@ -1,25 +1,19 @@
 function ReaderCommentsPanel({
   account,
-  commentSort,
   commentText,
   comments,
-  onCommentSort,
+  totalComments,
   onCommentText,
   onSubmitComment,
 }) {
   return (
     <aside className="reader-comments-panel">
-      <div>
-        <p className="mono-eyebrow">Reader voices</p>
-        <h2>Comments</h2>
-      </div>
-      <div className="comment-sort" aria-label="Sort comments">
-        <button className={commentSort === 'newest' ? 'active' : ''} onClick={() => onCommentSort('newest')} type="button">
-          Newest
-        </button>
-        <button className={commentSort === 'oldest' ? 'active' : ''} onClick={() => onCommentSort('oldest')} type="button">
-          Oldest
-        </button>
+      <div className="reader-comments-heading">
+        <div>
+          <p className="mono-eyebrow">Reader voices</p>
+          <h2>Comments</h2>
+        </div>
+        <span>{totalComments}</span>
       </div>
       <form
         className="reader-comment-form"

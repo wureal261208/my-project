@@ -1,4 +1,4 @@
-import { deleteField, doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { arrayUnion, deleteField, doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export const globalDataDefaults = {
@@ -58,6 +58,18 @@ export function subscribeUserData(userId, onData, onError) {
 
 export function saveGlobalData(data) {
   return setDoc(globalDataRef, withTimestamp({ ...cleanForFirestore(data), localBooks: deleteField() }), { merge: true })
+}
+
+export function saveBookComment(bookId, comment) {
+  return setDoc(
+    globalDataRef,
+    withTimestamp({
+      comments: {
+        [bookId]: arrayUnion(cleanForFirestore(comment)),
+      },
+    }),
+    { merge: true },
+  )
 }
 
 export function saveUserData(userId, data) {

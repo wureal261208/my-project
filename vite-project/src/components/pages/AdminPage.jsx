@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { getAuthor, getCategory, getCover, getDescription, getReaderUrl } from '../../utils/bookUtils'
+import { getAuthor, getCategory, getDescription, getReaderUrl } from '../../utils/bookUtils'
 import { getBookChapters, getTotalPages } from '../../utils/chapterUtils'
 
 const identityFields = [
@@ -9,9 +9,10 @@ const identityFields = [
 ]
 
 const mediaFields = [
-  { name: 'cover', label: 'Cover URL', placeholder: 'https://...' },
   { name: 'readerUrl', label: 'Reader URL', placeholder: 'https://...', type: 'url' },
 ]
+
+const NONE_COVER_URL = 'https://icons.veryicon.com/png/o/miscellaneous/myicon-1/none-1.png'
 
 const languageChoices = [
   { value: 'en', label: 'English', disabled: false },
@@ -45,6 +46,7 @@ function AdminPage({
   const publishedBooks = managedBooks.filter((book) => (book.status || 'published') === 'published').length
   const detailReadyBooks = managedBooks.filter((book) => !getBookWarnings(book).some((warning) => warning.id === 'description')).length
   const readerReadyBooks = managedBooks.filter((book) => isReaderReady(book)).length
+  const currentErrors = getFormErrors(adminBook, managedBooks)
   const currentWarnings = getFormWarnings(adminBook)
   const previewBook = useMemo(() => createPreviewBook(adminBook), [adminBook])
   const filteredManagedBooks = managedBooks.filter((book) => {
@@ -84,6 +86,19 @@ function AdminPage({
     })
   }
 
+  function updateCoverFile(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAdminBook((current) => ({ ...current, cover: reader.result }))
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
   function addStaff(event) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
@@ -98,6 +113,15 @@ function AdminPage({
     event.currentTarget.reset()
   }
 
+  function handleBookSubmit(event) {
+    if (currentErrors.length) {
+      event.preventDefault()
+      return
+    }
+
+    addManagedBook(event)
+  }
+
   return (
     <div className="admin-page">
       <section className="page-title admin-title">
@@ -105,20 +129,24 @@ function AdminPage({
           <p className="mono-eyebrow">Management</p>
           <h1>BookWorm management</h1>
         </div>
-        <p>
-          Manage the books, reader content, access rules, and team accounts that directly affect the main BookWorm site.
-        </p>
+        <div className="admin-title-side">
+          <p>
+            Manage the books, reader content, access rules, and team accounts that directly affect the main BookWorm site.
+          </p>
+        </div>
       </section>
 
-      <div className="admin-sticky-switcher" role="tablist" aria-label="Management sections">
-        <button className={activeAdminSection === 'book' ? 'active' : ''} onClick={() => setActiveAdminSection('book')} type="button">
-          <i className="bi bi-journal-plus" />
-          Push Book
-        </button>
-        <button className={activeAdminSection === 'team' ? 'active' : ''} onClick={() => setActiveAdminSection('team')} type="button">
-          <i className="bi bi-person-plus" />
-          Deputy Dev
-        </button>
+      <div className="admin-sticky-switcher">
+        <div className="admin-section-tabs" role="tablist" aria-label="Management sections">
+          <button className={activeAdminSection === 'book' ? 'active' : ''} onClick={() => setActiveAdminSection('book')} type="button">
+            <i className="bi bi-journal-plus" />
+            Push Book
+          </button>
+          <button className={activeAdminSection === 'team' ? 'active' : ''} onClick={() => setActiveAdminSection('team')} type="button">
+            <i className="bi bi-person-plus" />
+            Deputy Dev
+          </button>
+        </div>
       </div>
 
       <div className="metrics admin-metrics">
@@ -139,10 +167,17 @@ function AdminPage({
           </div>
 
           <div className="admin-validation-panel" aria-live="polite">
-            <strong>{currentWarnings.length ? 'Needs attention' : 'Ready checklist'}</strong>
-            {currentWarnings.length ? (
+            <strong>{currentErrors.length ? 'Cannot push yet' : currentWarnings.length ? 'Ready with notes' : 'Ready checklist'}</strong>
+            {currentErrors.length ? (
+              currentErrors.map((error) => (
+                <span className="admin-validation-error" key={error.id}>
+                  <i className="bi bi-x-circle" />
+                  {error.message}
+                </span>
+              ))
+            ) : currentWarnings.length ? (
               currentWarnings.map((warning) => (
-                <span key={warning.id}>
+                <span className="admin-validation-warning" key={warning.id}>
                   <i className="bi bi-exclamation-circle" />
                   {warning.message}
                 </span>
@@ -155,7 +190,7 @@ function AdminPage({
             )}
           </div>
 
-          <form className="admin-form admin-book-form" onSubmit={addManagedBook}>
+          <form className="admin-form admin-book-form" onSubmit={handleBookSubmit}>
             <fieldset>
               <legend>Detail information</legend>
               {identityFields.map((field) => (
@@ -213,6 +248,30 @@ function AdminPage({
 
             <fieldset>
               <legend>Reader setup</legend>
+              <div className="admin-cover-picker wide-field">
+                <img
+                  src={getAdminCover(adminBook)}
+                  alt=""
+                  onError={(event) => {
+                    event.currentTarget.src = NONE_COVER_URL
+                  }}
+                />
+                <div>
+                  <label>
+                    Cover URL
+                    <input
+                      value={adminBook.cover}
+                      onChange={(event) => updateAdminBook('cover', event.target.value)}
+                      placeholder="https://..."
+                    />
+                  </label>
+                  <label className="file-picker admin-cover-upload">
+                    <i className="bi bi-image" />
+                    Upload cover image
+                    <input accept="image/*" onChange={updateCoverFile} type="file" />
+                  </label>
+                </div>
+              </div>
               {mediaFields.map((field) => (
                 <label key={field.name}>
                   {field.label}
@@ -287,7 +346,7 @@ function AdminPage({
                   Cancel edit
                 </button>
               )}
-              <button className="primary-button" type="submit">
+              <button className="primary-button" disabled={currentErrors.length > 0} type="submit">
                 <i className="bi bi-cloud-upload" />
                 {adminBook.id ? 'Update book' : 'Add book to management'}
               </button>
@@ -313,7 +372,13 @@ function AdminPage({
 
                   return (
                     <div className="table-row admin-book-row" key={book.id}>
-                      <img src={getCover(book)} alt="" />
+                      <img
+                        src={getAdminCover(book)}
+                        alt=""
+                        onError={(event) => {
+                          event.currentTarget.src = NONE_COVER_URL
+                        }}
+                      />
                       <span>
                         {book.title}
                         <em className={`admin-status status-${book.status || 'published'}`}>{book.status || 'published'}</em>
@@ -424,7 +489,13 @@ function AdminDetailPreview({ book, onClose }) {
         <button aria-label="Close preview" className="admin-preview-close" onClick={onClose} type="button">
           <i className="bi bi-x-lg" />
         </button>
-        <img src={getCover(book)} alt="" />
+        <img
+          src={getAdminCover(book)}
+          alt=""
+          onError={(event) => {
+            event.currentTarget.src = NONE_COVER_URL
+          }}
+        />
         <div>
           <p className="mono-eyebrow">{getCategory(book)}</p>
           <h2 id="admin-preview-title">{book.title || 'Untitled book'}</h2>
@@ -468,6 +539,10 @@ function createPreviewBook(adminBook) {
   }
 }
 
+function getAdminCover(book) {
+  return book.formats?.['image/jpeg'] || book.cover || NONE_COVER_URL
+}
+
 function normalizePreviewChapters(chapters = []) {
   let startPage = 1
   return (chapters.length ? chapters : [createEmptyChapter(0)]).map((chapter, index) => {
@@ -485,17 +560,36 @@ function normalizePreviewChapters(chapters = []) {
 }
 
 function getFormWarnings(book) {
+  const errors = new Set(getFormErrors(book).map((error) => error.id))
+
   return [
-    !hasText(book.cover) && { id: 'cover', message: 'Missing cover image for Home and Detail.' },
-    !hasText(book.description) && { id: 'description', message: 'Missing description for Detail preview.' },
-    !hasText(book.readerUrl) && !hasText(book.readerText) && !book.chaptersDraft?.some((chapter) => hasText(chapter.content)) && {
-      id: 'reader',
-      message: 'Missing reader URL, reader text, or chapter content.',
+    !book.subjects?.split(',').some((subject) => hasText(subject)) && {
+      id: 'subjects',
+      message: 'Add subjects to make Discover filtering better.',
     },
-    !book.chaptersDraft?.some((chapter) => hasText(chapter.title) && hasText(chapter.pages)) && {
-      id: 'chapters',
-      message: 'Missing chapter title or pages.',
+    !book.chaptersDraft?.some((chapter) => hasText(chapter.content)) && hasText(book.readerUrl) && {
+      id: 'chapter-content',
+      message: 'Reader can open the URL, but pasted chapter content gives the best in-app reading page.',
     },
+  ].filter(Boolean).filter((warning) => !errors.has(warning.id))
+}
+
+function getFormErrors(book, managedBooks = []) {
+  const duplicateTitle = managedBooks.some((managedBook) => (
+    managedBook.id !== book.id && managedBook.title?.trim().toLowerCase() === book.title.trim().toLowerCase()
+  ))
+
+  return [
+    !hasText(book.title) && { id: 'title', message: 'Add a title.' },
+    duplicateTitle && { id: 'duplicate-title', message: 'A managed book already uses this title.' },
+    !hasText(book.author) && { id: 'author', message: 'Add an author.' },
+    !hasText(book.category) && { id: 'category', message: 'Choose a category or shelf.' },
+    !hasText(book.cover) && { id: 'cover', message: 'Add a cover URL or upload a cover image.' },
+    !isValidImageSource(book.cover) && { id: 'cover-url', message: 'Cover must be an http(s) image URL or an uploaded image.' },
+    !hasText(book.description) && { id: 'description', message: 'Add a description for the detail page.' },
+    !hasReaderSource(book) && { id: 'reader', message: 'Add a reader URL, full reader text, or chapter content.' },
+    hasText(book.readerUrl) && !isValidHttpUrl(book.readerUrl) && { id: 'reader-url', message: 'Reader URL must start with http:// or https://.' },
+    !hasValidChapterDraft(book) && { id: 'chapters', message: 'Add at least one chapter with a title and page count above 0.' },
   ].filter(Boolean)
 }
 
@@ -526,6 +620,31 @@ function hasChapters(book) {
 
 function isReaderReady(book) {
   return Boolean(getReaderUrl(book) || book.readerText || book.chapterList?.some((chapter) => chapter.content))
+}
+
+function hasReaderSource(book) {
+  return Boolean(hasText(book.readerUrl) || hasText(book.readerText) || book.chaptersDraft?.some((chapter) => hasText(chapter.content)))
+}
+
+function hasValidChapterDraft(book) {
+  return Boolean(book.chaptersDraft?.some((chapter) => hasText(chapter.title) && Number(chapter.pages) > 0))
+}
+
+function isValidHttpUrl(value) {
+  if (!hasText(value)) return true
+
+  try {
+    const url = new URL(String(value).trim())
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function isValidImageSource(value) {
+  if (!hasText(value)) return true
+  const source = String(value).trim()
+  return source.startsWith('data:image/') || isValidHttpUrl(source)
 }
 
 export default AdminPage
