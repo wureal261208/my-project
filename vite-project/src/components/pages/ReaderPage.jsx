@@ -287,7 +287,6 @@ function ReaderPage({
 
       <div className="reader-main">
         <ReaderFrame
-          activeBook={activeBook}
           chapterPage={chapterPage}
           chapterStrip={chapterStrip}
           currentChapter={currentChapter}
@@ -405,8 +404,14 @@ function getFetchableReaderUrl(url) {
       const cacheTextMatch = parsedUrl.pathname.match(/^\/cache\/epub\/(\d+)\/pg\d+\.txt$/i)
       if (cacheTextMatch) return `/api/reader-text/${cacheTextMatch[1]}/plain`
 
+      const cacheReaderMatch = parsedUrl.pathname.match(/^\/cache\/epub\/(\d+)\//i)
+      if (cacheReaderMatch) return `/api/reader-text/${cacheReaderMatch[1]}/plain`
+
       const ebookTextMatch = parsedUrl.pathname.match(/^\/ebooks\/(\d+)\.txt/i)
       if (ebookTextMatch) return `/api/reader-text/${ebookTextMatch[1]}/plain`
+
+      const ebookPageMatch = parsedUrl.pathname.match(/^\/ebooks\/(\d+)(?:\.html?)?$/i)
+      if (ebookPageMatch) return `/api/reader-text/${ebookPageMatch[1]}/plain`
 
       const fileMatch = parsedUrl.pathname.match(/^\/files\/(\d+)\/([^/]+)$/i)
       if (fileMatch) return `/api/reader-text/${fileMatch[1]}/file/${fileMatch[2]}`
